@@ -77,35 +77,35 @@ namespace Prototypist.TaskChain.DataTypes
             {
                 if (at.key.Equals(key))
                 {
-                    at.Value = value;
+                    at.Do(x=>x.Value = value);
                     return;
                 }
                 at = at.next;
             };
         }
 
-        public void DoOrThrow(TKey key, Action<IValueNode<TValue>> action)
+        public void DoOrThrow(TKey key, Action<BuildableConcurrent<TValue>.ValueHolder> action)
         {
             var at = GetNodeOrThrow(key);
             while (true)
             {
                 if (at.key.Equals(key))
                 {
-                    at.actionChainer.Run(() => action(at));
+                    at.Do((x) =>  action(x));
                     return;
                 }
                 at = at.next;
             };
         }
 
-        public TOut DoOrThrow<TOut>(TKey key, Func<IValueNode<TValue>, TOut> function)
+        public TOut DoOrThrow<TOut>(TKey key, Func<BuildableConcurrent<TValue>.ValueHolder, TOut> function)
         {
             var at = GetNodeOrThrow(key);
             while (true)
             {
                 if (at.key.Equals(key))
                 {
-                    return at.actionChainer.Run(() => function(at));
+                    return at.Do(x => function(x));
                 }
                 at = at.next;
             };
@@ -129,7 +129,7 @@ namespace Prototypist.TaskChain.DataTypes
             {
                 if (at.key.Equals(key))
                 {
-                    at.Value = value;
+                    at.Do(x=>x.Value = value);
                     return;
                 }
                 if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
@@ -200,7 +200,7 @@ namespace Prototypist.TaskChain.DataTypes
             };
         }
 
-        public void DoOrAdd(TKey key, Action<IValueNode<TValue>> action, TValue fallback)
+        public void DoOrAdd(TKey key, Action<BuildableConcurrent<TValue>.ValueHolder> action, TValue fallback)
         {
             var hash = Math.Abs(Math.Max(-int.MaxValue, key.GetHashCode()));
             var a = hash % 64;
@@ -218,7 +218,7 @@ namespace Prototypist.TaskChain.DataTypes
             {
                 if (at.key.Equals(key))
                 {
-                    at.actionChainer.Run(() => action(at));
+                    at.Do(x => action(x));
                     return;
                 }
                 if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
@@ -333,10 +333,10 @@ namespace Prototypist.TaskChain.DataTypes
             {
                 if (at.key.Equals(key))
                 {
-                    return at.actionChainer.Run(() =>
+                    return at.Do(x =>
                     {
-                        var res = function(at.Value);
-                        at.Value = res;
+                        var res = function(x.Value);
+                        x.Value = res;
                         return res;
                     });
                 }
@@ -368,10 +368,10 @@ namespace Prototypist.TaskChain.DataTypes
             {
                 if (at.key.Equals(key))
                 {
-                    return at.actionChainer.Run(() =>
+                    return at.Do(x =>
                     {
-                        var res = function(at.Value);
-                        at.Value = res;
+                        var res = function(x.Value);
+                        x.Value = res;
                         return res;
                     });
                 }
@@ -392,10 +392,10 @@ namespace Prototypist.TaskChain.DataTypes
             {
                 if (at.key.Equals(key))
                 {
-                    return at.actionChainer.Run(() =>
+                    return at.Do(x =>
                     {
-                        var res = function(at.Value);
-                        at.Value = res;
+                        var res = function(x.Value);
+                        x.Value = res;
                         return res;
                     });
                 }
@@ -407,7 +407,7 @@ namespace Prototypist.TaskChain.DataTypes
             };
         }
 
-        public TOut DoAddIfNeeded<TOut>(TKey key, Func<IValueNode<TValue>, TOut> function, TValue fallback)
+        public TOut DoAddIfNeeded<TOut>(TKey key, Func<BuildableConcurrent<TValue>.ValueHolder, TOut> function, TValue fallback)
         {
             var hash = Math.Abs(Math.Max(-int.MaxValue, key.GetHashCode()));
             var a = hash % 64;
@@ -418,24 +418,24 @@ namespace Prototypist.TaskChain.DataTypes
             var mine = new BuildableListNode<TKey, TValue>(key, taskManager, fallback);
             if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
             {
-                return mine.actionChainer.Run(() => function(mine));
+                return mine.Do(x => function(x));
             }
             var at = tree.backing[a].backing[b].backing[c];
             while (true)
             {
                 if (at.key.Equals(key))
                 {
-                    return at.actionChainer.Run(() => function(at));
+                    return at.Do(x => function(x));
                 }
                 if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
                 {
-                    return at.actionChainer.Run(() => function(at));
+                    return at.Do(x => function(x));
                 }
                 at = at.next;
             };
         }
 
-        public TOut DoAddIfNeeded<TOut>(TKey key, Func<IValueNode<TValue>, TOut> function, Func<TValue> fallback)
+        public TOut DoAddIfNeeded<TOut>(TKey key, Func<BuildableConcurrent<TValue>.ValueHolder, TOut> function, Func<TValue> fallback)
         {
             var hash = Math.Abs(Math.Max(-int.MaxValue, key.GetHashCode()));
             var a = hash % 64;
@@ -447,19 +447,19 @@ namespace Prototypist.TaskChain.DataTypes
             if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
             {
                 mine.Build(fallback());
-                return mine.actionChainer.Run(() => function(mine));
+                return mine.Do(x => function(x));
             }
             var at = tree.backing[a].backing[b].backing[c];
             while (true)
             {
                 if (at.key.Equals(key))
                 {
-                    return at.actionChainer.Run(() => function(at));
+                    return at.Do(x => function(x));
                 }
                 if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
                 {
                     mine.Build(fallback());
-                    return at.actionChainer.Run(() => function(at));
+                    return at.Do(x => function(x));
                 }
                 at = at.next;
             }

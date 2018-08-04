@@ -96,7 +96,7 @@ namespace Prototypist.TaskChain.DataTypes
             {
                 if (object.Equals(at.value, value))
                 {
-                    return at.value;
+                    return (T)at.value;
                 }
                 if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
                 {
@@ -159,7 +159,7 @@ namespace Prototypist.TaskChain.DataTypes
                                     var at = l3;
                                     while (at != null)
                                     {
-                                        yield return at.value;
+                                        yield return (T)at.value;
                                         at = at.next;
                                     }
                                 }
