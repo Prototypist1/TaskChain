@@ -84,7 +84,7 @@ namespace Prototypist.TaskChain.DataTypes
             };
         }
 
-        public void DoOrThrow(TKey key, Action<BuildableConcurrent<TValue>.ValueHolder> action)
+        public void DoOrThrow(TKey key, Action<Concurrent<TValue>.ValueHolder> action)
         {
             var at = GetNodeOrThrow(key);
             while (true)
@@ -98,7 +98,7 @@ namespace Prototypist.TaskChain.DataTypes
             };
         }
 
-        public TOut DoOrThrow<TOut>(TKey key, Func<BuildableConcurrent<TValue>.ValueHolder, TOut> function)
+        public TOut DoOrThrow<TOut>(TKey key, Func<Concurrent<TValue>.ValueHolder, TOut> function)
         {
             var at = GetNodeOrThrow(key);
             while (true)
@@ -200,7 +200,7 @@ namespace Prototypist.TaskChain.DataTypes
             };
         }
 
-        public void DoOrAdd(TKey key, Action<BuildableConcurrent<TValue>.ValueHolder> action, TValue fallback)
+        public void DoOrAdd(TKey key, Action<Concurrent<TValue>.ValueHolder> action, TValue fallback)
         {
             var hash = Math.Abs(Math.Max(-int.MaxValue, key.GetHashCode()));
             var a = hash % 64;
@@ -407,7 +407,7 @@ namespace Prototypist.TaskChain.DataTypes
             };
         }
 
-        public TOut DoAddIfNeeded<TOut>(TKey key, Func<BuildableConcurrent<TValue>.ValueHolder, TOut> function, TValue fallback)
+        public TOut DoAddIfNeeded<TOut>(TKey key, Func<Concurrent<TValue>.ValueHolder, TOut> function, TValue fallback)
         {
             var hash = Math.Abs(Math.Max(-int.MaxValue, key.GetHashCode()));
             var a = hash % 64;
@@ -435,7 +435,7 @@ namespace Prototypist.TaskChain.DataTypes
             };
         }
 
-        public TOut DoAddIfNeeded<TOut>(TKey key, Func<BuildableConcurrent<TValue>.ValueHolder, TOut> function, Func<TValue> fallback)
+        public TOut DoAddIfNeeded<TOut>(TKey key, Func<Concurrent<TValue>.ValueHolder, TOut> function, Func<TValue> fallback)
         {
             var hash = Math.Abs(Math.Max(-int.MaxValue, key.GetHashCode()));
             var a = hash % 64;

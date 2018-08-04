@@ -8,8 +8,6 @@ using System.Threading.Tasks;
 
 namespace Prototypist.TaskChain.DataTypes
 {
-
-
     public class Concurrent<TValue>
     {
 
@@ -31,20 +29,20 @@ namespace Prototypist.TaskChain.DataTypes
             public void Dispose() { }
         }
 
-        public TValue Value
+        public virtual TValue Value
         {
             get
             {
                 return (TValue)Volatile.Read(ref value);
             }
-            private set
+            protected set
             {
                 Volatile.Write(ref this.value, value);
             }
         }
 
-        private readonly IActionChainer actionChainer;
-        private object value;
+        protected readonly IActionChainer actionChainer;
+        protected object value;
         
         public Concurrent(TValue value, IActionChainer actionChainer)
         {
@@ -78,86 +76,43 @@ namespace Prototypist.TaskChain.DataTypes
     }
 
 
-    public class BuildableConcurrent<TValue>
+    public class BuildableConcurrent<TValue>: Concurrent<TValue>
     {
 
         private const int TRUE = 1;
         private const int FALSE = 0;
         private int building = TRUE;
         private readonly ITaskManager taskManager;
-        private readonly IActionChainer actionChainer;
-        private object value;
-
-        public struct ValueHolder : IDisposable
-        {
-            private readonly BuildableConcurrent<TValue> owner;
-
-            public ValueHolder(BuildableConcurrent<TValue> owner)
-            {
-                this.owner = owner;
-            }
-
-            public TValue Value
-            {
-                get => owner.Value;
-                set => owner.Value = value;
-            }
-
-            public void Dispose(){}
-        }
-
-        public TValue Value
+        
+        public override TValue Value
         {
             get
             {
                 taskManager.SpinUntil(() => building == FALSE || Volatile.Read(ref building) == FALSE);
                 return (TValue)Volatile.Read(ref value);
             }
-            private set
+            protected set
             {
                 taskManager.SpinUntil(() => building == FALSE || Volatile.Read(ref building) == FALSE);
                 Volatile.Write(ref this.value, value);
             }
         }
         
-        public BuildableConcurrent(TValue value, ITaskManager taskManager)
+        public BuildableConcurrent(TValue value, ITaskManager taskManager):base(value, taskManager.GetActionChainer())
         {
-            this.value = value;
             building = FALSE;
             this.taskManager = taskManager;
-            this.actionChainer = taskManager.GetActionChainer();
         }
 
-        public BuildableConcurrent(ITaskManager taskManager)
+        public BuildableConcurrent(ITaskManager taskManager) : base(default, taskManager.GetActionChainer())
         {
             this.taskManager = taskManager;
-            this.actionChainer = taskManager.GetActionChainer();
         }
 
         public BuildableConcurrent(TValue value) : this(value, Chaining.taskManager)
         {
         }
-
-        public void Do(Action<ValueHolder> action)
-        {
-            actionChainer.Run(() => {
-                using (var wrapper = new ValueHolder(this))
-                {
-                    action(wrapper);
-                }
-            });
-        }
-
-        public TRes Do<TRes>(Func<ValueHolder, TRes> action)
-        {
-            return actionChainer.Run(() => {
-                using (var wrapper = new ValueHolder(this))
-                {
-                    return action(wrapper);
-                }
-            });
-        }
-
+        
         public void Build(TValue res)
         {
             this.value = res;
