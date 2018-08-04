@@ -1,16 +1,17 @@
-﻿using System;
+﻿using Prototypist.TaskChain.DataTypes;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Xunit;
 
 namespace Prototypist.TaskChain.Test
 {
-    public class ConcurrentListLikeTests
+    public class ConcurrentOrderedTests
     {
         [Fact]
         public async Task AddStuff()
         {
-            var student = new ConcurrentListLike<int>();
+            var student = new ConcurrentOrdered<int>();
 
             var tasks = new List<Task>();
             for (var i = 0; i < 20; i++)
@@ -33,7 +34,7 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void Scramble()
         {
-            var student = new ConcurrentListLike<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
+            var student = new ConcurrentOrdered<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
 
             Parallel.For(0, 20, (i) =>
             {
@@ -48,7 +49,7 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void UpdateAndIterate()
         {
-            var student = new ConcurrentListLike<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
+            var student = new ConcurrentOrdered<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
 
             // this just need to not throw
             foreach (var item in student.ToArray())
@@ -61,7 +62,7 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void ReadAndIterate()
         {
-            var student = new ConcurrentListLike<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
+            var student = new ConcurrentOrdered<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
 
             foreach (var item in student.ToArray())
             {
@@ -73,7 +74,7 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void DoubleIterate()
         {
-            var student = new ConcurrentListLike<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
+            var student = new ConcurrentOrdered<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
             var count = 0;
 
             foreach (var x in student.ToArray())

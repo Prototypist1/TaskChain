@@ -1,13 +1,14 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
 
-namespace Prototypist.TaskChain
+namespace Prototypist.TaskChain.DataTypes
 {
-    public class ConcurrentSet<T>
+    public class ConcurrentSet<T> : IEnumerable<T>
     {
 
-        TreeNode<TreeNode<TreeNode<BuildableListNode<T, T>>>> tree = new TreeNode<TreeNode<TreeNode<BuildableListNode<T, T>>>>(64);
+        TreeNode<TreeNode<TreeNode<SetListNode<T>>>> tree = new TreeNode<TreeNode<TreeNode<SetListNode<T>>>>(64);
 
         public ConcurrentSet()
         {
@@ -54,9 +55,9 @@ namespace Prototypist.TaskChain
             var a = hash % 64;
             var b = (hash % 1024) / 64;
             var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<BuildableListNode<T, T>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<BuildableListNode<T, T>>(4), null);
-            var mine = new BuildableListNode<T, T>(value);
+            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<SetListNode<T>>>(16), null);
+            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<SetListNode<T>>(4), null);
+            var mine = new SetListNode<T>(value);
             if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
             {
                 return false;
@@ -83,9 +84,9 @@ namespace Prototypist.TaskChain
             var a = hash % 64;
             var b = (hash % 1024) / 64;
             var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<BuildableListNode>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<BuildableListNode>(4), null);
-            var mine = new BuildableListNode(value);
+            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<SetListNode<T>>>(16), null);
+            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<SetListNode<T>>(4), null);
+            var mine = new SetListNode<T>(value);
             if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
             {
                 return value;
@@ -110,11 +111,38 @@ namespace Prototypist.TaskChain
             return !ContainsOrAdd(value);
         }
 
-        /// <summary>
-        /// this is dangerous if it is run while you are adding
-        /// 
-        /// </summary>
-        public IEnumerable<T> ToEnumerable()
+
+        
+
+        public void AddOrThrow(T value)
+        {
+            var hash = Math.Abs(Math.Max(-int.MaxValue, value.GetHashCode()));
+            var a = hash % 64;
+            var b = (hash % 1024) / 64;
+            var c = (hash % 4096) / 1024;
+            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<SetListNode<T>>>(16), null);
+            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<SetListNode<T>>(4), null);
+            var mine = new SetListNode<T>(value);
+            if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
+            {
+                return;
+            }
+            var at = tree.backing[a].backing[b].backing[c];
+            while (true)
+            {
+                if (object.Equals(at.value, value))
+                {
+                    throw new Exception($"item already added: {value}");
+                }
+                if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
+                {
+                    return;
+                }
+                at = at.next;
+            };
+        }
+
+        public IEnumerator<T> GetEnumerator()
         {
             foreach (var l1 in tree.backing)
             {
@@ -141,33 +169,6 @@ namespace Prototypist.TaskChain
                 }
             }
         }
-
-        public void AddOrThrow(T value)
-        {
-            var hash = Math.Abs(Math.Max(-int.MaxValue, value.GetHashCode()));
-            var a = hash % 64;
-            var b = (hash % 1024) / 64;
-            var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<BuildableListNode>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<BuildableListNode>(4), null);
-            var mine = new BuildableListNode(value);
-            if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
-            {
-                return;
-            }
-            var at = tree.backing[a].backing[b].backing[c];
-            while (true)
-            {
-                if (object.Equals(at.value, value))
-                {
-                    throw new Exception($"item already added: {value}");
-                }
-                if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
-                {
-                    return;
-                }
-                at = at.next;
-            };
-        }
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

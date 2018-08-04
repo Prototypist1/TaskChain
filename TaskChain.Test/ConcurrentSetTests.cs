@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Prototypist.TaskChain.DataTypes;
+using System;
 using Xunit;
 
 namespace Prototypist.TaskChain.Test
@@ -42,7 +43,7 @@ namespace Prototypist.TaskChain.Test
                 thing.TryAdd(i);
             }
             var count = 0;
-            foreach (var uhh in thing.ToEnumerable())
+            foreach (var uhh in thing)
             {
                 count++;
             }

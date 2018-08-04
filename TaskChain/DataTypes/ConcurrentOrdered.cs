@@ -4,18 +4,18 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 
-namespace Prototypist.TaskChain
+namespace Prototypist.TaskChain.DataTypes
 {
     // TODO redo, more custom
     /// <summary>
     /// A list without remove
     /// </summary>
-    public class ConcurrentListLike<TValue>: IReadOnlyList<TValue>
+    public class ConcurrentOrdered<TValue>: IReadOnlyList<TValue>
     {
         private readonly IActionChainer actionChainer;
         private readonly List<ItemShell> backing = new List<ItemShell>();
 
-        private ConcurrentListLike(IEnumerable<TValue> old, IActionChainer actionChainer)
+        private ConcurrentOrdered(IEnumerable<TValue> old, IActionChainer actionChainer)
         {
             this.actionChainer = actionChainer;
             actionChainer.Run(() =>
@@ -27,17 +27,17 @@ namespace Prototypist.TaskChain
             });
         }
 
-        private ConcurrentListLike(IActionChainer actionChainer)
+        private ConcurrentOrdered(IActionChainer actionChainer)
         {
             this.actionChainer = actionChainer;
         }
 
-        public ConcurrentListLike(IEnumerable<TValue> old) :
+        public ConcurrentOrdered(IEnumerable<TValue> old) :
             this(old, Chaining.taskManager.GetActionChainer())
         {
         }
 
-        public ConcurrentListLike() :
+        public ConcurrentOrdered() :
             this(Chaining.taskManager.GetActionChainer())
         {
         }

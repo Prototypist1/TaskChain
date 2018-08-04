@@ -1,4 +1,5 @@
-﻿using Prototypist.ParallelChain;
+﻿
+using Prototypist.TaskChain.DataTypes;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -6,13 +7,13 @@ using Xunit;
 
 namespace Prototypist.TaskChain.Test
 {
-    public class ConcurrentDictionaryLikeTests
+    public class ConcurrentIndexedTests
     {
         [Theory]
         [InlineData(1)]
         public void AddUpdate(int i)
         {
-            var thing = new ConcurrentDictionaryLike<int, string>();
+            var thing = new ConcurrentIndexed<int, string>();
 
             thing.UpdateOrAdd(i, (s) => s + " world", "hello");
             Assert.Equal("hello", thing.GetOrThrow(i));
@@ -24,7 +25,7 @@ namespace Prototypist.TaskChain.Test
         [InlineData(1)]
         public void AddUpdateOrThrow(int i)
         {
-            var thing = new ConcurrentDictionaryLike<int, string>();
+            var thing = new ConcurrentIndexed<int, string>();
 
             thing.AddOrThrow(i, "hello");
             Assert.Equal("hello", thing.GetOrThrow(i));
@@ -42,7 +43,7 @@ namespace Prototypist.TaskChain.Test
         [InlineData(1)]
         public void GetFallback(int i)
         {
-            var thing = new ConcurrentDictionaryLike<int, string>();
+            var thing = new ConcurrentIndexed<int, string>();
 
             Assert.Equal("not hello", thing.GetOrAdd(i, () => "not hello"));
             Assert.Equal("not hello", thing.GetOrAdd(i, () => "hello"));
@@ -52,7 +53,7 @@ namespace Prototypist.TaskChain.Test
         [InlineData(1)]
         public void UpdateFallback(int i)
         {
-            var thing = new ConcurrentDictionaryLike<int, string>();
+            var thing = new ConcurrentIndexed<int, string>();
 
             Assert.Equal("not hello", thing.UpdateOrAdd(i, (x) => x + " world", "not hello"));
             Assert.Equal("not hello", thing.GetOrThrow(i));
@@ -62,7 +63,7 @@ namespace Prototypist.TaskChain.Test
         public async Task AddUpdateParallel()
         {
             {
-                var thing = new ConcurrentDictionaryLike<int, string>();
+                var thing = new ConcurrentIndexed<int, string>();
 
                 var tasks = new List<Task>();
                 for (var i = 0; i < 100; i = i + 3)
@@ -79,13 +80,13 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void Enumerate()
         {
-            var thing = new ConcurrentDictionaryLike<int, string>();
+            var thing = new ConcurrentIndexed<int, string>();
             for (var i = 0; i < 100; i++)
             {
                 thing.AddOrThrow(i, () => $"{i}");
             }
             var count = 0;
-            foreach (var uhh in thing.ToEnumerable())
+            foreach (var uhh in thing)
             {
                 count++;
             }
@@ -95,7 +96,7 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void TryGet()
         {
-            var target = new ConcurrentDictionaryLike<int, string>();
+            var target = new ConcurrentIndexed<int, string>();
 
             Assert.False(target.TryGet(1,out var first));
 
@@ -108,7 +109,7 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void GetOrTrhow()
         {
-            var target = new ConcurrentDictionaryLike<int, string>();
+            var target = new ConcurrentIndexed<int, string>();
 
             Assert.ThrowsAny<Exception>(() => target.GetOrThrow(1));
 
@@ -120,7 +121,7 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void SetOrThrow()
         {
-            var target = new ConcurrentDictionaryLike<int, string>();
+            var target = new ConcurrentIndexed<int, string>();
 
             Assert.ThrowsAny<Exception>(() => target.SetOrThrow(1, "1"));
 
@@ -133,7 +134,7 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void DoOrThrow()
         {
-            var target = new ConcurrentDictionaryLike<int, string>();
+            var target = new ConcurrentIndexed<int, string>();
 
             Assert.ThrowsAny<Exception>(() => target.DoOrThrow(1, x => x.Value = x.Value + "!"));
 
@@ -146,7 +147,7 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void DoOrThrow_Func()
         {
-            var target = new ConcurrentDictionaryLike<int, string>();
+            var target = new ConcurrentIndexed<int, string>();
 
             Assert.ThrowsAny<Exception>(() => target.DoOrThrow(1, x => x.Value + "!"));
 
@@ -158,7 +159,7 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void Set()
         {
-            var target = new ConcurrentDictionaryLike<int, string>();
+            var target = new ConcurrentIndexed<int, string>();
 
             target.Set(1, "1");
             Assert.Equal("1", target.GetOrThrow(1));
@@ -169,7 +170,7 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void GetOrAdd()
         {
-            var target = new ConcurrentDictionaryLike<int, string>();
+            var target = new ConcurrentIndexed<int, string>();
 
             Assert.Equal("1", target.GetOrAdd(1, "1"));
             Assert.Equal("1", target.GetOrAdd(1, "1!"));
@@ -178,7 +179,7 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void GetOrAdd_Func()
         {
-            var target = new ConcurrentDictionaryLike<int, string>();
+            var target = new ConcurrentIndexed<int, string>();
 
             Assert.Equal("1", target.GetOrAdd(1, () => "1"));
             Assert.Equal("1", target.GetOrAdd(1, () => "1!"));
@@ -187,7 +188,7 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void DoOrAdd()
         {
-            var target = new ConcurrentDictionaryLike<int, string>();
+            var target = new ConcurrentIndexed<int, string>();
 
             target.DoOrAdd(1, x => x.Value = "1!", "1");
             Assert.Equal("1", target.GetOrThrow(1));
@@ -198,7 +199,7 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void AddOrThrow()
         {
-            var target = new ConcurrentDictionaryLike<int, string>();
+            var target = new ConcurrentIndexed<int, string>();
 
             target.AddOrThrow(1, "1");
 
@@ -208,7 +209,7 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void AddOrThrow_Func()
         {
-            var target = new ConcurrentDictionaryLike<int, string>();
+            var target = new ConcurrentIndexed<int, string>();
 
             target.AddOrThrow(1, () => "1");
 
@@ -218,7 +219,7 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void UpdateOrAdd()
         {
-            var target = new ConcurrentDictionaryLike<int, string>();
+            var target = new ConcurrentIndexed<int, string>();
 
             Assert.Equal("1", target.UpdateOrAdd(1, x => x + "!", "1"));
             Assert.Equal("1!", target.UpdateOrAdd(1, x => x + "!", "1"));
@@ -227,7 +228,7 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void UpdateOrAdd_Func()
         {
-            var target = new ConcurrentDictionaryLike<int, string>();
+            var target = new ConcurrentIndexed<int, string>();
 
             Assert.Equal("1", target.UpdateOrAdd(1, x => x + "!", () => "1"));
             Assert.Equal("1!", target.UpdateOrAdd(1, x => x + "!", () => "1"));
@@ -236,7 +237,7 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void UpdateOrThrow()
         {
-            var target = new ConcurrentDictionaryLike<int, string>();
+            var target = new ConcurrentIndexed<int, string>();
 
             Assert.ThrowsAny<Exception>(() => target.UpdateOrThrow(1, x => x + "!"));
             target.Set(1, "1");
@@ -246,7 +247,7 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void DoAddIfNeeded()
         {
-            var target = new ConcurrentDictionaryLike<int, string>();
+            var target = new ConcurrentIndexed<int, string>();
 
             Assert.Equal("1!", target.DoAddIfNeeded(1, x => x.Value + "!", "1"));
             target.Set(1, "1");
@@ -256,7 +257,7 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void DoAddIfNeeded_Func()
         {
-            var target = new ConcurrentDictionaryLike<int, string>();
+            var target = new ConcurrentIndexed<int, string>();
 
             Assert.Equal("1!", target.DoAddIfNeeded(1, x => x.Value + "!", () => "1"));
             target.Set(1, "1");
