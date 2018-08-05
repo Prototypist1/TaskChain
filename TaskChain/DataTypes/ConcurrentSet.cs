@@ -10,9 +10,9 @@ namespace Prototypist.TaskChain.DataTypes
     {
         private readonly TreeNode<TreeNode<TreeNode<IndexedListNode<TKey,TValue>>>> tree = new TreeNode<TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>>(64);
         
-        public bool Contains(TKey value)
+        public bool Contains(TKey key)
         {
-            var hash = Math.Abs(Math.Max(-int.MaxValue, value.GetHashCode()));
+            var hash = Math.Abs(Math.Max(-int.MaxValue, key.GetHashCode()));
             var a = hash % 64;
             var ata = tree.backing[a];
             if (ata == null)
@@ -29,7 +29,7 @@ namespace Prototypist.TaskChain.DataTypes
             var atc = atb.backing[c];
             while (atc != null)
             {
-                if (object.Equals(atc.value, value))
+                if (object.Equals(atc.key, key))
                 {
                     return true;
                 }

@@ -257,6 +257,8 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void DoAddIfNeeded_Func()
         {
+            throw new NotImplementedException();
+
             var target = new ConcurrentHashIndexedTree<int, string>();
 
             Assert.Equal("1!", target.DoAddIfNeeded(1, x => x.Value + "!", () => "1"));

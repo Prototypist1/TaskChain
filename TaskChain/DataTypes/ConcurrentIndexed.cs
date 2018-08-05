@@ -29,16 +29,19 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var result = backing.TryGet(key, out var item);
-                res = item.Value;
-                return result;
+                if (backing.TryGet(key, out var item)) {
+                    res = item.Value;
+                    return true;
+                }
+                res = default;
+                return false;
             }
             finally
             {
                 Interlocked.Decrement(ref enumerationCount);
             }
         }
-        public bool UpdateOrThrow(TKey key, TValue newValue)
+        public bool TryUpdate(TKey key, TValue newValue)
         {
             try
             {
@@ -280,6 +283,14 @@ namespace Prototypist.TaskChain.DataTypes
     }
 
     public static class ConcurrentHashIndexedTreeExtensions {
+        public static void UpdateOrThrow<TKey, TValue>(this ConcurrentHashIndexedTree<TKey, TValue> self, TKey key, TValue newValue)
+        {
+            if (self.TryUpdate(key, newValue))
+            {
+                return;
+            }
+            throw new Exception("No item found for that key");
+        }
         public static TValue GetOrThrow<TKey, TValue>(this ConcurrentHashIndexedTree<TKey, TValue> self, TKey key) {
             if (self.TryGet(key, out var res)) {
                 return res;
@@ -301,7 +312,7 @@ namespace Prototypist.TaskChain.DataTypes
         }
         public static void AddOrThrow<TKey, TValue>(this ConcurrentHashIndexedTree<TKey, TValue> self, TKey key, TValue value) {
             var res = self.GetOrAdd(key, value);
-            if (ReferenceEquals(res, value))
+            if (!ReferenceEquals(res, value))
             {
                 throw new Exception("No item found for that key");
             }
