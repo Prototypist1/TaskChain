@@ -75,69 +75,33 @@ namespace Prototypist.TaskChain.DataTypes
 
     }
 
-
-    public class BuildableConcurrent<TValue>: Concurrent<TValue>
-    {
-
-        private const int TRUE = 1;
-        private const int FALSE = 0;
-        private int building = TRUE;
-        private readonly ITaskManager taskManager;
+    //public class ConcurrentListNode<TValue> : Concurrent<TValue>
+    //{
+    //    public ConcurrentListNode<TValue> next;
         
-        public override TValue Value
-        {
-            get
-            {
-                taskManager.SpinUntil(() => building == FALSE || Volatile.Read(ref building) == FALSE);
-                return (TValue)Volatile.Read(ref value);
-            }
-            protected set
-            {
-                taskManager.SpinUntil(() => building == FALSE || Volatile.Read(ref building) == FALSE);
-                Volatile.Write(ref this.value, value);
-            }
-        }
-        
-        public BuildableConcurrent(TValue value, ITaskManager taskManager):base(value, taskManager.GetActionChainer())
-        {
-            building = FALSE;
-            this.taskManager = taskManager;
-        }
+    //    public ConcurrentListNode( TValue value) : base(value)
+    //    {
+    //    }
+    //}
 
-        public BuildableConcurrent(ITaskManager taskManager) : base(default, taskManager.GetActionChainer())
-        {
-            this.taskManager = taskManager;
-        }
+    //public class BuildableConcurrentListNode<TKey, TValue> : BuildableConcurrent<TValue>
+    //{
+    //    public readonly TKey key;
+    //    public BuildableConcurrentListNode<TKey, TValue> next;
 
-        public BuildableConcurrent(TValue value) : this(value, Chaining.taskManager)
-        {
-        }
-        
-        public void Build(TValue res)
-        {
-            this.value = res;
-            building = FALSE;
-        }
-    }
+    //    public BuildableConcurrentListNode(TKey key, ITaskManager taskManager) : base(taskManager)
+    //    {
+    //        this.key = key;
+    //    }
 
-    public class BuildableListNode<TKey, TValue> : BuildableConcurrent<TValue>
-    {
-        public readonly TKey key;
-        public BuildableListNode<TKey, TValue> next;
+    //    public BuildableConcurrentListNode(TKey key, TValue value) : base(value)
+    //    {
+    //        this.key = key;
+    //    }
 
-        public BuildableListNode(TKey key, ITaskManager taskManager) : base(taskManager)
-        {
-            this.key = key;
-        }
-
-        public BuildableListNode(TKey key, TValue value) : base(value)
-        {
-            this.key = key;
-        }
-
-        public BuildableListNode(TKey key,  ITaskManager taskManager, TValue value) : base(value, taskManager)
-        {
-            this.key = key;
-        }
-    }
+    //    public BuildableConcurrentListNode(TKey key,  ITaskManager taskManager, TValue value) : base(value, taskManager)
+    //    {
+    //        this.key = key;
+    //    }
+    //}
 }

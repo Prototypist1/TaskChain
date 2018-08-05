@@ -14,7 +14,7 @@ namespace Prototypist.TaskChain.DataTypes
     // this would be way simpler if I did not creat so many crazy methods...
     public class ConcurrentIndexed<TKey, TValue> : IEnumerable<KeyValuePair<TKey, TValue>>
     {
-        TreeNode<TreeNode<TreeNode<BuildableListNode<TKey, TValue>>>> tree = new TreeNode<TreeNode<TreeNode<BuildableListNode<TKey, TValue>>>>(64);
+        TreeNode<TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>> tree = new TreeNode<TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>>(64);
         private readonly ITaskManager taskManager;
 
         public ConcurrentIndexed()
@@ -32,7 +32,7 @@ namespace Prototypist.TaskChain.DataTypes
 
         #region Help
 
-        private BuildableListNode<TKey, TValue> GetNodeOrThrow(TKey key)
+        private IndexedListNode<TKey, TValue> GetNodeOrThrow(TKey key)
         {
             var hash = Math.Abs(Math.Max(-int.MaxValue, key.GetHashCode()));
             var a = hash % 64;
@@ -50,7 +50,7 @@ namespace Prototypist.TaskChain.DataTypes
             {
                 if (at.key.Equals(key))
                 {
-                    return at.Value;
+                    return at.value.Value;
                 }
                 at = at.next;
             };
@@ -77,7 +77,7 @@ namespace Prototypist.TaskChain.DataTypes
             {
                 if (at.key.Equals(key))
                 {
-                    at.Do(x=>x.Value = value);
+                    at.value.Do(x => x.Value = value);
                     return;
                 }
                 at = at.next;
@@ -91,7 +91,7 @@ namespace Prototypist.TaskChain.DataTypes
             {
                 if (at.key.Equals(key))
                 {
-                    at.Do((x) =>  action(x));
+                    at.value.Do((x) => action(x));
                     return;
                 }
                 at = at.next;
@@ -105,7 +105,7 @@ namespace Prototypist.TaskChain.DataTypes
             {
                 if (at.key.Equals(key))
                 {
-                    return at.Do(x => function(x));
+                    return at.value.Do(x => function(x));
                 }
                 at = at.next;
             };
@@ -117,9 +117,9 @@ namespace Prototypist.TaskChain.DataTypes
             var a = hash % 64;
             var b = (hash % 1024) / 64;
             var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<BuildableListNode<TKey, TValue>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<BuildableListNode<TKey, TValue>>(4), null);
-            var mine = new BuildableListNode<TKey, TValue>(key, taskManager, value);
+            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>(16), null);
+            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
+            var mine = new IndexedListNode<TKey, TValue>(key, new BuildableConcurrent<TValue>(value, taskManager));
             if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
             {
                 return;
@@ -129,7 +129,7 @@ namespace Prototypist.TaskChain.DataTypes
             {
                 if (at.key.Equals(key))
                 {
-                    at.Do(x=>x.Value = value);
+                    at.value.Do(x => x.Value = value);
                     return;
                 }
                 if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
@@ -146,9 +146,9 @@ namespace Prototypist.TaskChain.DataTypes
             var a = hash % 64;
             var b = (hash % 1024) / 64;
             var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<BuildableListNode<TKey, TValue>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<BuildableListNode<TKey, TValue>>(4), null);
-            var mine = new BuildableListNode<TKey, TValue>(key, taskManager, fallback);
+            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>(16), null);
+            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
+            var mine = new IndexedListNode<TKey, TValue>(key, new BuildableConcurrent<TValue>(fallback, taskManager));
             if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
             {
                 return fallback;
@@ -158,7 +158,7 @@ namespace Prototypist.TaskChain.DataTypes
             {
                 if (at.key.Equals(key))
                 {
-                    return at.Value;
+                    return at.value.Value;
                 }
                 if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
                 {
@@ -174,13 +174,13 @@ namespace Prototypist.TaskChain.DataTypes
             var a = hash % 64;
             var b = (hash % 1024) / 64;
             var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<BuildableListNode<TKey, TValue>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<BuildableListNode<TKey, TValue>>(4), null);
-            var mine = new BuildableListNode<TKey, TValue>(key, taskManager);
+            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>(16), null);
+            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
+            var mine = new IndexedListNode<TKey, TValue>(key, new BuildableConcurrent<TValue>(taskManager));
             if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
             {
                 var res = fallback();
-                mine.Build(res);
+                mine.value.Build(res);
                 return res;
             }
             var at = tree.backing[a].backing[b].backing[c];
@@ -188,12 +188,12 @@ namespace Prototypist.TaskChain.DataTypes
             {
                 if (at.key.Equals(key))
                 {
-                    return at.Value;
+                    return at.value.Value;
                 }
                 if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
                 {
                     var res = fallback();
-                    mine.Build(res);
+                    mine.value.Build(res);
                     return res;
                 }
                 at = at.next;
@@ -206,9 +206,9 @@ namespace Prototypist.TaskChain.DataTypes
             var a = hash % 64;
             var b = (hash % 1024) / 64;
             var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<BuildableListNode<TKey, TValue>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<BuildableListNode<TKey, TValue>>(4), null);
-            var mine = new BuildableListNode<TKey, TValue>(key, taskManager, fallback);
+            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>(16), null);
+            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
+            var mine = new IndexedListNode<TKey, TValue>(key, new BuildableConcurrent<TValue>(fallback, taskManager));
             if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
             {
                 return;
@@ -218,7 +218,7 @@ namespace Prototypist.TaskChain.DataTypes
             {
                 if (at.key.Equals(key))
                 {
-                    at.Do(x => action(x));
+                    at.value.Do(x => action(x));
                     return;
                 }
                 if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
@@ -235,9 +235,9 @@ namespace Prototypist.TaskChain.DataTypes
             var a = hash % 64;
             var b = (hash % 1024) / 64;
             var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<BuildableListNode<TKey, TValue>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<BuildableListNode<TKey, TValue>>(4), null);
-            var mine = new BuildableListNode<TKey, TValue>(key, taskManager, value);
+            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>(16), null);
+            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
+            var mine = new IndexedListNode<TKey, TValue>(key, new BuildableConcurrent<TValue>(value, taskManager));
             if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
             {
                 return;
@@ -263,12 +263,12 @@ namespace Prototypist.TaskChain.DataTypes
             var a = hash % 64;
             var b = (hash % 1024) / 64;
             var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<BuildableListNode<TKey, TValue>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<BuildableListNode<TKey, TValue>>(4), null);
-            var mine = new BuildableListNode<TKey, TValue>(key, taskManager);
+            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>(16), null);
+            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
+            var mine = new IndexedListNode<TKey, TValue>(key, new BuildableConcurrent<TValue>(taskManager));
             if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
             {
-                mine.Build(value());
+                mine.value.Build(value());
                 return;
             }
             var at = tree.backing[a].backing[b].backing[c];
@@ -280,7 +280,7 @@ namespace Prototypist.TaskChain.DataTypes
                 }
                 if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
                 {
-                    mine.Build(value());
+                    mine.value.Build(value());
                     return;
                 }
                 at = at.next;
@@ -293,9 +293,9 @@ namespace Prototypist.TaskChain.DataTypes
             var a = hash % 64;
             var b = (hash % 1024) / 64;
             var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<BuildableListNode<TKey, TValue>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<BuildableListNode<TKey, TValue>>(4), null);
-            var mine = new BuildableListNode<TKey, TValue>(key, taskManager);
+            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>(16), null);
+            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
+            var mine = new IndexedListNode<TKey, TValue>(key, new BuildableConcurrent<TValue>(taskManager));
             if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
             {
                 return true;
@@ -321,9 +321,9 @@ namespace Prototypist.TaskChain.DataTypes
             var a = hash % 64;
             var b = (hash % 1024) / 64;
             var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<BuildableListNode<TKey, TValue>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<BuildableListNode<TKey, TValue>>(4), null);
-            var mine = new BuildableListNode<TKey, TValue>(key, taskManager, fallback);
+            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>(16), null);
+            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
+            var mine = new IndexedListNode<TKey, TValue>(key, new BuildableConcurrent<TValue>(fallback, taskManager));
             if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
             {
                 return fallback;
@@ -333,7 +333,7 @@ namespace Prototypist.TaskChain.DataTypes
             {
                 if (at.key.Equals(key))
                 {
-                    return at.Do(x =>
+                    return at.value.Do(x =>
                     {
                         var res = function(x.Value);
                         x.Value = res;
@@ -354,13 +354,13 @@ namespace Prototypist.TaskChain.DataTypes
             var a = hash % 64;
             var b = (hash % 1024) / 64;
             var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<BuildableListNode<TKey, TValue>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<BuildableListNode<TKey, TValue>>(4), null);
-            var mine = new BuildableListNode<TKey, TValue>(key, taskManager);
+            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>(16), null);
+            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
+            var mine = new IndexedListNode<TKey, TValue>(key, new BuildableConcurrent<TValue>(taskManager));
             if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
             {
                 var res = fallback();
-                mine.Build(res);
+                mine.value.Build(res);
                 return res;
             }
             var at = tree.backing[a].backing[b].backing[c];
@@ -368,7 +368,7 @@ namespace Prototypist.TaskChain.DataTypes
             {
                 if (at.key.Equals(key))
                 {
-                    return at.Do(x =>
+                    return at.value.Do(x =>
                     {
                         var res = function(x.Value);
                         x.Value = res;
@@ -378,7 +378,7 @@ namespace Prototypist.TaskChain.DataTypes
                 if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
                 {
                     var res = fallback();
-                    mine.Build(res);
+                    mine.value.Build(res);
                     return res;
                 }
                 at = at.next;
@@ -392,7 +392,7 @@ namespace Prototypist.TaskChain.DataTypes
             {
                 if (at.key.Equals(key))
                 {
-                    return at.Do(x =>
+                    return at.value.Do(x =>
                     {
                         var res = function(x.Value);
                         x.Value = res;
@@ -413,23 +413,23 @@ namespace Prototypist.TaskChain.DataTypes
             var a = hash % 64;
             var b = (hash % 1024) / 64;
             var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<BuildableListNode<TKey, TValue>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<BuildableListNode<TKey, TValue>>(4), null);
-            var mine = new BuildableListNode<TKey, TValue>(key, taskManager, fallback);
+            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>(16), null);
+            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
+            var mine = new IndexedListNode<TKey, TValue>(key, new BuildableConcurrent<TValue>(fallback, taskManager));
             if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
             {
-                return mine.Do(x => function(x));
+                return mine.value.Do(x => function(x));
             }
             var at = tree.backing[a].backing[b].backing[c];
             while (true)
             {
                 if (at.key.Equals(key))
                 {
-                    return at.Do(x => function(x));
+                    return at.value.Do(x => function(x));
                 }
                 if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
                 {
-                    return at.Do(x => function(x));
+                    return at.value.Do(x => function(x));
                 }
                 at = at.next;
             };
@@ -441,25 +441,25 @@ namespace Prototypist.TaskChain.DataTypes
             var a = hash % 64;
             var b = (hash % 1024) / 64;
             var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<BuildableListNode<TKey, TValue>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<BuildableListNode<TKey, TValue>>(4), null);
-            var mine = new BuildableListNode<TKey, TValue>(key, taskManager);
+            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>(16), null);
+            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
+            var mine = new IndexedListNode<TKey, TValue>(key, new BuildableConcurrent<TValue>(taskManager));
             if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
             {
-                mine.Build(fallback());
-                return mine.Do(x => function(x));
+                mine.value.Build(fallback());
+                return mine.value.Do(x => function(x));
             }
             var at = tree.backing[a].backing[b].backing[c];
             while (true)
             {
                 if (at.key.Equals(key))
                 {
-                    return at.Do(x => function(x));
+                    return at.value.Do(x => function(x));
                 }
                 if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
                 {
-                    mine.Build(fallback());
-                    return at.Do(x => function(x));
+                    mine.value.Build(fallback());
+                    return at.value.Do(x => function(x));
                 }
                 at = at.next;
             }
@@ -483,7 +483,7 @@ namespace Prototypist.TaskChain.DataTypes
                                     var at = l3;
                                     while (at != null)
                                     {
-                                        yield return new KeyValuePair<TKey, TValue>(at.key,  at.Value);
+                                        yield return new KeyValuePair<TKey, TValue>(at.key, at.value.Value);
                                         at = at.next;
                                     }
                                 }

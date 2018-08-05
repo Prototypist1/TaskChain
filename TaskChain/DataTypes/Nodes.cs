@@ -4,7 +4,7 @@ using System.Threading;
 namespace Prototypist.TaskChain
 {
 
-    internal class TreeNode<TChild>
+    public class TreeNode<TChild>
     {
         public readonly TChild[] backing = new TChild[16];
 
@@ -14,16 +14,35 @@ namespace Prototypist.TaskChain
         }
     }
 
-    internal class SetListNode<TValue> 
+    public class IndexedListNode<TKey, TValue>
     {
-        public readonly object value;
-        public SetListNode<TValue> next;
+        public readonly TKey key;
+        public readonly TValue value;
+        public IndexedListNode<TKey, TValue> next;
 
-        public SetListNode(TValue value)
+        public IndexedListNode(TKey key, TValue value)
         {
+            this.key = key;
             this.value = value;
         }
     }
+
+    //public class SetListNode<TValue> : TreeListNode<TValue, SetListNode<TValue>>
+    //{
+    //    public SetListNode(TValue value): base(value)
+    //    {
+    //    }
+    //}
+
+    //public class IndexedListNode<TKey, TValue, TNext> : TreeListNode<TValue, TNext>
+    //    where TNext : IndexedListNode<TKey, TValue, TNext>
+    //{
+
+    //    public IndexedListNode(TKey key, TValue value): base(value)
+    //    {
+    //        this.key = key;
+    //    }
+    //}
 
 
 }
