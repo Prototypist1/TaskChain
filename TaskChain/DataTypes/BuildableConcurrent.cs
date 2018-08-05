@@ -38,7 +38,11 @@ namespace Prototypist.TaskChain.DataTypes
         public BuildableConcurrent(TValue value) : this(value, Chaining.taskManager)
         {
         }
-        
+
+        public BuildableConcurrent() : this(Chaining.taskManager)
+        {
+        }
+
         public void Build(TValue res)
         {
             this.value = res;

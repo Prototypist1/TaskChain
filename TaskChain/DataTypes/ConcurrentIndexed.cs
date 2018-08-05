@@ -9,502 +9,337 @@ using System.Threading;
 namespace Prototypist.TaskChain.DataTypes
 {
 
-
-
-    // this would be way simpler if I did not creat so many crazy methods...
-    public class ConcurrentIndexed<TKey, TValue> : IEnumerable<KeyValuePair<TKey, TValue>>
+    public class ConcurrentHashIndexedTree<TKey, TValue> :  IEnumerable<KeyValuePair<TKey, TValue>>
     {
-        TreeNode<TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>> tree = new TreeNode<TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>>(64);
-        private readonly ITaskManager taskManager;
+        private readonly RawConcurrentHashIndexedTree<TKey, BuildableConcurrent<TValue>> backing = new RawConcurrentHashIndexedTree<TKey, BuildableConcurrent<TValue>>();
+        private const long enumerationAdd = 1_000_000_000;
+        private long enumerationCount = 0;
 
-        public ConcurrentIndexed()
+        private void NoModificationDuringEnumeration()
         {
-            this.taskManager = Chaining.taskManager;
-        }
-
-        public ConcurrentIndexed(IEnumerable<Tuple<TKey, TValue>> x) : this()
-        {
-            foreach (var pair in x)
+            var res = Interlocked.Increment(ref enumerationCount);
+            if (res >= enumerationAdd)
             {
-                AddOrThrow(pair.Item1, pair.Item2);
+                throw new Exception("No modification during enumeration");
             }
-        }
-
-        #region Help
-
-        private IndexedListNode<TKey, TValue> GetNodeOrThrow(TKey key)
-        {
-            var hash = Math.Abs(Math.Max(-int.MaxValue, key.GetHashCode()));
-            var a = hash % 64;
-            var b = (hash % 1024) / 64;
-            var c = (hash % 4096) / 1024;
-            return tree.backing[a].backing[b].backing[c];
-        }
-
-        #endregion
-
-        public TValue GetOrThrow(TKey key)
-        {
-            var at = GetNodeOrThrow(key);
-            while (true)
-            {
-                if (at.key.Equals(key))
-                {
-                    return at.value.Value;
-                }
-                at = at.next;
-            };
         }
 
         public bool TryGet(TKey key, out TValue res)
         {
             try
             {
-                res = GetOrThrow(key);
-                return true;
+                NoModificationDuringEnumeration();
+                var result = backing.TryGet(key, out var item);
+                res = item.Value;
+                return result;
             }
-            catch
+            finally
             {
-                res = default(TValue);
-                return false;
+                Interlocked.Decrement(ref enumerationCount);
             }
         }
-
-        public void SetOrThrow(TKey key, TValue value)
+        public bool SetIfExists(TKey key, TValue newValue)
         {
-            var at = GetNodeOrThrow(key);
-            while (true)
+            try
             {
-                if (at.key.Equals(key))
+                NoModificationDuringEnumeration();
+                if (backing.TryGet(key, out var item))
                 {
-                    at.value.Do(x => x.Value = value);
-                    return;
-                }
-                at = at.next;
-            };
-        }
-
-        public void DoOrThrow(TKey key, Action<Concurrent<TValue>.ValueHolder> action)
-        {
-            var at = GetNodeOrThrow(key);
-            while (true)
-            {
-                if (at.key.Equals(key))
-                {
-                    at.value.Do((x) => action(x));
-                    return;
-                }
-                at = at.next;
-            };
-        }
-
-        public TOut DoOrThrow<TOut>(TKey key, Func<Concurrent<TValue>.ValueHolder, TOut> function)
-        {
-            var at = GetNodeOrThrow(key);
-            while (true)
-            {
-                if (at.key.Equals(key))
-                {
-                    return at.value.Do(x => function(x));
-                }
-                at = at.next;
-            };
-        }
-
-        public void Set(TKey key, TValue value)
-        {
-            var hash = Math.Abs(Math.Max(-int.MaxValue, key.GetHashCode()));
-            var a = hash % 64;
-            var b = (hash % 1024) / 64;
-            var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
-            var mine = new IndexedListNode<TKey, TValue>(key, new BuildableConcurrent<TValue>(value, taskManager));
-            if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
-            {
-                return;
-            }
-            var at = tree.backing[a].backing[b].backing[c];
-            while (true)
-            {
-                if (at.key.Equals(key))
-                {
-                    at.value.Do(x => x.Value = value);
-                    return;
-                }
-                if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
-                {
-                    return;
-                }
-                at = at.next;
-            };
-        }
-
-        public TValue GetOrAdd(TKey key, TValue fallback)
-        {
-            var hash = Math.Abs(Math.Max(-int.MaxValue, key.GetHashCode()));
-            var a = hash % 64;
-            var b = (hash % 1024) / 64;
-            var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
-            var mine = new IndexedListNode<TKey, TValue>(key, new BuildableConcurrent<TValue>(fallback, taskManager));
-            if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
-            {
-                return fallback;
-            }
-            var at = tree.backing[a].backing[b].backing[c];
-            while (true)
-            {
-                if (at.key.Equals(key))
-                {
-                    return at.value.Value;
-                }
-                if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
-                {
-                    return fallback;
-                }
-                at = at.next;
-            };
-        }
-
-        public TValue GetOrAdd(TKey key, Func<TValue> fallback)
-        {
-            var hash = Math.Abs(Math.Max(-int.MaxValue, key.GetHashCode()));
-            var a = hash % 64;
-            var b = (hash % 1024) / 64;
-            var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
-            var mine = new IndexedListNode<TKey, TValue>(key, new BuildableConcurrent<TValue>(taskManager));
-            if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
-            {
-                var res = fallback();
-                mine.value.Build(res);
-                return res;
-            }
-            var at = tree.backing[a].backing[b].backing[c];
-            while (true)
-            {
-                if (at.key.Equals(key))
-                {
-                    return at.value.Value;
-                }
-                if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
-                {
-                    var res = fallback();
-                    mine.value.Build(res);
-                    return res;
-                }
-                at = at.next;
-            };
-        }
-
-        public void DoOrAdd(TKey key, Action<Concurrent<TValue>.ValueHolder> action, TValue fallback)
-        {
-            var hash = Math.Abs(Math.Max(-int.MaxValue, key.GetHashCode()));
-            var a = hash % 64;
-            var b = (hash % 1024) / 64;
-            var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
-            var mine = new IndexedListNode<TKey, TValue>(key, new BuildableConcurrent<TValue>(fallback, taskManager));
-            if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
-            {
-                return;
-            }
-            var at = tree.backing[a].backing[b].backing[c];
-            while (true)
-            {
-                if (at.key.Equals(key))
-                {
-                    at.value.Do(x => action(x));
-                    return;
-                }
-                if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
-                {
-                    return;
-                }
-                at = at.next;
-            };
-        }
-
-        public void AddOrThrow(TKey key, TValue value)
-        {
-            var hash = Math.Abs(Math.Max(-int.MaxValue, key.GetHashCode()));
-            var a = hash % 64;
-            var b = (hash % 1024) / 64;
-            var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
-            var mine = new IndexedListNode<TKey, TValue>(key, new BuildableConcurrent<TValue>(value, taskManager));
-            if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
-            {
-                return;
-            }
-            var at = tree.backing[a].backing[b].backing[c];
-            while (true)
-            {
-                if (at.key.Equals(key))
-                {
-                    throw new Exception("Key already has a value");
-                }
-                if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
-                {
-                    return;
-                }
-                at = at.next;
-            };
-        }
-
-        public void AddOrThrow(TKey key, Func<TValue> value)
-        {
-            var hash = Math.Abs(Math.Max(-int.MaxValue, key.GetHashCode()));
-            var a = hash % 64;
-            var b = (hash % 1024) / 64;
-            var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
-            var mine = new IndexedListNode<TKey, TValue>(key, new BuildableConcurrent<TValue>(taskManager));
-            if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
-            {
-                mine.value.Build(value());
-                return;
-            }
-            var at = tree.backing[a].backing[b].backing[c];
-            while (true)
-            {
-                if (at.key.Equals(key))
-                {
-                    throw new Exception("Key already has a value");
-                }
-                if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
-                {
-                    mine.value.Build(value());
-                    return;
-                }
-                at = at.next;
-            };
-        }
-
-        public bool TryAdd(TKey key, TValue value)
-        {
-            var hash = Math.Abs(Math.Max(-int.MaxValue, key.GetHashCode()));
-            var a = hash % 64;
-            var b = (hash % 1024) / 64;
-            var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
-            var mine = new IndexedListNode<TKey, TValue>(key, new BuildableConcurrent<TValue>(taskManager));
-            if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
-            {
-                return true;
-            }
-            var at = tree.backing[a].backing[b].backing[c];
-            while (true)
-            {
-                if (at.key.Equals(key))
-                {
-                    return false;
-                }
-                if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
-                {
+                    item.Do(x => x.Value = newValue);
                     return true;
                 }
-                at = at.next;
-            };
-        }
-
-        public TValue UpdateOrAdd(TKey key, Func<TValue, TValue> function, TValue fallback)
-        {
-            var hash = Math.Abs(Math.Max(-int.MaxValue, key.GetHashCode()));
-            var a = hash % 64;
-            var b = (hash % 1024) / 64;
-            var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
-            var mine = new IndexedListNode<TKey, TValue>(key, new BuildableConcurrent<TValue>(fallback, taskManager));
-            if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
-            {
-                return fallback;
+                return false;
             }
-            var at = tree.backing[a].backing[b].backing[c];
-            while (true)
+            finally
             {
-                if (at.key.Equals(key))
-                {
-                    return at.value.Do(x =>
-                    {
-                        var res = function(x.Value);
-                        x.Value = res;
-                        return res;
-                    });
-                }
-                if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
-                {
-                    return fallback;
-                }
-                at = at.next;
-            };
-        }
-
-        public TValue UpdateOrAdd(TKey key, Func<TValue, TValue> function, Func<TValue> fallback)
-        {
-            var hash = Math.Abs(Math.Max(-int.MaxValue, key.GetHashCode()));
-            var a = hash % 64;
-            var b = (hash % 1024) / 64;
-            var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
-            var mine = new IndexedListNode<TKey, TValue>(key, new BuildableConcurrent<TValue>(taskManager));
-            if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
-            {
-                var res = fallback();
-                mine.value.Build(res);
-                return res;
+                Interlocked.Decrement(ref enumerationCount);
             }
-            var at = tree.backing[a].backing[b].backing[c];
-            while (true)
-            {
-                if (at.key.Equals(key))
-                {
-                    return at.value.Do(x =>
-                    {
-                        var res = function(x.Value);
-                        x.Value = res;
-                        return res;
-                    });
-                }
-                if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
-                {
-                    var res = fallback();
-                    mine.value.Build(res);
-                    return res;
-                }
-                at = at.next;
-            };
         }
-
-        public TValue UpdateOrThrow(TKey key, Func<TValue, TValue> function)
+        public bool TryDo(TKey key, Action<Concurrent<TValue>.ValueHolder> action)
         {
-            var at = GetNodeOrThrow(key);
-            while (true)
+            try
             {
-                if (at.key.Equals(key))
+                NoModificationDuringEnumeration();
+                if (backing.TryGet(key, out var item))
                 {
-                    return at.value.Do(x =>
-                    {
-                        var res = function(x.Value);
-                        x.Value = res;
-                        return res;
-                    });
+                    item.Do(action);
+                    return true;
                 }
-                if (Volatile.Read(ref at.next) == null)
-                {
-                    throw new Exception("Key not found");
-                }
-                at = at.next;
-            };
+                return false;
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
         }
-
+        public bool TryDo<TOut>(TKey key, Func<Concurrent<TValue>.ValueHolder, TOut> function, out TOut res) {
+            try
+            {
+                NoModificationDuringEnumeration();
+                if (backing.TryGet(key, out var item))
+                {
+                    res= item.Do(function);
+                    return true;
+                }
+                res = default;
+                return false;
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
+        public void Set(TKey key, TValue value) {
+            try
+            {
+                NoModificationDuringEnumeration();
+                var toAdd = new IndexedListNode<TKey, BuildableConcurrent<TValue>>(key, new BuildableConcurrent<TValue>(value));
+                var item = backing.GetOrAdd(toAdd);
+                item.Do(x => x.Value = value);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
+        public TValue GetOrAdd(TKey key, TValue fallback) {
+            try
+            {
+                NoModificationDuringEnumeration();
+                var toAdd = new IndexedListNode<TKey, BuildableConcurrent<TValue>>(key, new BuildableConcurrent<TValue>(fallback));
+                return backing.GetOrAdd(toAdd).Value;
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
+        public TValue GetOrAdd(TKey key, Func<TValue> fallback) {
+            try
+            {
+                NoModificationDuringEnumeration();
+                var toAdd = new IndexedListNode<TKey, BuildableConcurrent<TValue>>(key, new BuildableConcurrent<TValue>());
+                var current = backing.GetOrAdd(toAdd);
+                if (ReferenceEquals(current, toAdd)) {
+                    toAdd.value.Build(fallback());
+                }
+                return current.Value;
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
+        public void AddOrThrow(TKey key, Func<TValue> fallback)
+        {
+            try
+            {
+                NoModificationDuringEnumeration();
+                var toAdd = new IndexedListNode<TKey, BuildableConcurrent<TValue>>(key, new BuildableConcurrent<TValue>());
+                var current = backing.GetOrAdd(toAdd);
+                if (ReferenceEquals(current, toAdd))
+                {
+                    toAdd.value.Build(fallback());
+                }
+                else {
+                    throw new Exception("Item already exits");
+                }
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
+        public void DoOrAdd(TKey key, Action<Concurrent<TValue>.ValueHolder> action, TValue fallback) {
+            try
+            {
+                NoModificationDuringEnumeration();
+                var toAdd = new IndexedListNode<TKey, BuildableConcurrent<TValue>>(key, new BuildableConcurrent<TValue>(fallback));
+                var current = backing.GetOrAdd(toAdd);
+                if (!ReferenceEquals(current, toAdd))
+                {
+                    toAdd.value.Do(action);
+                }
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
+        public void DoOrAdd(TKey key, Action<Concurrent<TValue>.ValueHolder> action, Func<TValue> fallback) {
+            try
+            {
+                NoModificationDuringEnumeration();
+                var toAdd = new IndexedListNode<TKey, BuildableConcurrent<TValue>>(key, new BuildableConcurrent<TValue>());
+                var current = backing.GetOrAdd(toAdd);
+                if (ReferenceEquals(current, toAdd))
+                {
+                    toAdd.value.Build(fallback());
+                }
+                else
+                {
+                    toAdd.value.Do(action);
+                }
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
+        public bool DoOrAdd<TOut>(TKey key, Func<Concurrent<TValue>.ValueHolder,TOut> function, TValue fallback, out TOut res)
+        {
+            try
+            {
+                NoModificationDuringEnumeration();
+                var toAdd = new IndexedListNode<TKey, BuildableConcurrent<TValue>>(key, new BuildableConcurrent<TValue>(fallback));
+                var current = backing.GetOrAdd(toAdd);
+                if (!ReferenceEquals(current, toAdd))
+                {
+                    res = toAdd.value.Do(function);
+                    return true;
+                }
+                res = default;
+                return false;
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
+        public bool DoOrAdd<TOut>(TKey key, Func<Concurrent<TValue>.ValueHolder, TOut> function, Func<TValue> fallback, out TOut res)
+        {
+            try
+            {
+                NoModificationDuringEnumeration();
+                var toAdd = new IndexedListNode<TKey, BuildableConcurrent<TValue>>(key, new BuildableConcurrent<TValue>());
+                var current = backing.GetOrAdd(toAdd);
+                if (ReferenceEquals(current, toAdd))
+                {
+                    toAdd.value.Build(fallback());
+                    res = default;
+                    return false;
+                }
+                else
+                {
+                    res = toAdd.value.Do(function);
+                    return true;
+                }
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
         public TOut DoAddIfNeeded<TOut>(TKey key, Func<Concurrent<TValue>.ValueHolder, TOut> function, TValue fallback)
         {
-            var hash = Math.Abs(Math.Max(-int.MaxValue, key.GetHashCode()));
-            var a = hash % 64;
-            var b = (hash % 1024) / 64;
-            var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
-            var mine = new IndexedListNode<TKey, TValue>(key, new BuildableConcurrent<TValue>(fallback, taskManager));
-            if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
+            try
             {
-                return mine.value.Do(x => function(x));
+                NoModificationDuringEnumeration();
+                var toAdd = new IndexedListNode<TKey, BuildableConcurrent<TValue>>(key, new BuildableConcurrent<TValue>(fallback));
+                var current = backing.GetOrAdd(toAdd);
+                return toAdd.value.Do(function);
             }
-            var at = tree.backing[a].backing[b].backing[c];
-            while (true)
+            finally
             {
-                if (at.key.Equals(key))
-                {
-                    return at.value.Do(x => function(x));
-                }
-                if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
-                {
-                    return at.value.Do(x => function(x));
-                }
-                at = at.next;
-            };
+                Interlocked.Decrement(ref enumerationCount);
+            }
         }
-
         public TOut DoAddIfNeeded<TOut>(TKey key, Func<Concurrent<TValue>.ValueHolder, TOut> function, Func<TValue> fallback)
         {
-            var hash = Math.Abs(Math.Max(-int.MaxValue, key.GetHashCode()));
-            var a = hash % 64;
-            var b = (hash % 1024) / 64;
-            var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
-            var mine = new IndexedListNode<TKey, TValue>(key, new BuildableConcurrent<TValue>(taskManager));
-            if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], mine, null) == null)
+            try
             {
-                mine.value.Build(fallback());
-                return mine.value.Do(x => function(x));
+                NoModificationDuringEnumeration();
+                var toAdd = new IndexedListNode<TKey, BuildableConcurrent<TValue>>(key, new BuildableConcurrent<TValue>());
+                var current = backing.GetOrAdd(toAdd);
+                if (ReferenceEquals(current, toAdd))
+                {
+                    toAdd.value.Build(fallback());
+                }
+                return toAdd.value.Do(function);
             }
-            var at = tree.backing[a].backing[b].backing[c];
-            while (true)
+            finally
             {
-                if (at.key.Equals(key))
-                {
-                    return at.value.Do(x => function(x));
-                }
-                if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
-                {
-                    mine.value.Build(fallback());
-                    return at.value.Do(x => function(x));
-                }
-                at = at.next;
+                Interlocked.Decrement(ref enumerationCount);
             }
         }
-
-
-        public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
-        {
-            foreach (var l1 in tree.backing)
+    
+        public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() {
+            Interlocked.Add(ref enumerationCount, enumerationAdd);
+            while (Volatile.Read(ref enumerationCount) % enumerationAdd != 0)
             {
-                if (l1 != null)
-                {
-                    foreach (var l2 in l1.backing)
-                    {
-                        if (l2 != null)
-                        {
-                            foreach (var l3 in l2.backing)
-                            {
-                                if (l3 != null)
-                                {
-                                    var at = l3;
-                                    while (at != null)
-                                    {
-                                        yield return new KeyValuePair<TKey, TValue>(at.key, at.value.Value);
-                                        at = at.next;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                // TODO do tasks?
             }
+            foreach (var item in backing)
+            {
+                yield return new KeyValuePair<TKey, TValue>(item.key, item.value.Value);
+            }
+            Interlocked.Add(ref enumerationCount, -enumerationAdd);
         }
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
     }
 
-    public static class SortaDictionaryExtensions
-    {
-        public static void Set<TKey, TValue>(this ConcurrentIndexed<TKey, TValue> inner, TKey key, TValue value)
-        {
-            inner.DoOrThrow(key, (data) =>
-            {
-                data.Value = value;
-            });
+    public static class ConcurrentHashIndexedTreeExtensions {
+        public static TValue GetOrThrow<TKey, TValue>(this ConcurrentHashIndexedTree<TKey, TValue> self, TKey key) {
+            if (self.TryGet(key, out var res)) {
+                return res;
+            }
+            throw new Exception("No item found for that key");
         }
-    }
+        public static void DoOrThrow<TKey, TValue>(this ConcurrentHashIndexedTree<TKey, TValue> self, TKey key, Action<Concurrent<TValue>.ValueHolder> action) {
+            if (self.TryDo(key, action)) {
+                return;
+            }
+            throw new Exception("No item found for that key");
+        }
+        public static TOut DoOrThrow<TKey, TValue,TOut>(this ConcurrentHashIndexedTree<TKey, TValue> self, TKey key, Func<Concurrent<TValue>.ValueHolder, TOut> function) {
+            if (self.TryDo(key, function, out var res))
+            {
+                return res;
+            }
+            throw new Exception("No item found for that key");
+        }
+        public static void AddOrThrow<TKey, TValue>(this ConcurrentHashIndexedTree<TKey, TValue> self, TKey key, TValue value) {
+            var res = self.GetOrAdd(key, value);
+            if (ReferenceEquals(res, value))
+            {
+                throw new Exception("No item found for that key");
+            }
+        }
+        public static bool TryAdd<TKey, TValue>(this ConcurrentHashIndexedTree<TKey, TValue> self, TKey key, TValue value) {
+            var res = self.GetOrAdd(key, value);
+            return ReferenceEquals(res, value);
+        }
+        public static TValue UpdateOrAdd<TKey, TValue>(this ConcurrentHashIndexedTree<TKey, TValue> self, TKey key, Func<TValue, TValue> function, TValue fallback) {
+            var res = default(TValue);
+            self.DoOrAdd(key, x =>
+            {
+                res = function(x.Value);
+                x.Value = res;
+            },fallback);
+            return res;
+        }
+        public static TValue UpdateOrAdd<TKey, TValue>(this ConcurrentHashIndexedTree<TKey, TValue> self, TKey key, Func<TValue, TValue> function, Func<TValue> fallback) {
+            var res = default(TValue);
+            self.DoOrAdd(key, x =>
+            {
+                res = function(x.Value);
+                x.Value = res;
+            }, fallback);
+            return res;
+        }
+        public static TValue UpdateOrThrow<TKey, TValue>(this ConcurrentHashIndexedTree<TKey, TValue> self, TKey key, Func<TValue, TValue> function) {
+            var res = default(TValue);
+            if (self.TryDo(key, x =>
+            {
+                res = function(x.Value);
+                x.Value = res;
+            })){
+                return res;
+            }
+            throw new Exception("No item found for that key");
+        }
 
+
+    }
 }
