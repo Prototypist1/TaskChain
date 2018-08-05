@@ -6,157 +6,272 @@ using System.Threading;
 
 namespace Prototypist.TaskChain.DataTypes
 {
-    // TODO redo, more custom
-    /// <summary>
-    /// A list without remove
-    /// </summary>
-    public class ConcurrentOrdered<TValue>: IReadOnlyList<TValue>
+
+    public class RawConcurrentArrayArray<TValue> : IReadOnlyList<TValue>
+        where TValue : class
     {
-        private readonly IActionChainer actionChainer;
-        private readonly List<ItemShell> backing = new List<ItemShell>();
-
-        private ConcurrentOrdered(IEnumerable<TValue> old, IActionChainer actionChainer)
-        {
-            this.actionChainer = actionChainer;
-            actionChainer.Run(() =>
-            {
-                foreach (var item in old)
-                {
-                    backing.Add(new ItemShell(item, actionChainer.GetActionChainer()));
-                }
-            });
-        }
-
-        private ConcurrentOrdered(IActionChainer actionChainer)
-        {
-            this.actionChainer = actionChainer;
-        }
-
-        public ConcurrentOrdered(IEnumerable<TValue> old) :
-            this(old, Chaining.taskManager.GetActionChainer())
-        {
-        }
-
-        public ConcurrentOrdered() :
-            this(Chaining.taskManager.GetActionChainer())
-        {
-        }
+        private readonly Concurrent<TValue[][]> backing = new Concurrent<TValue[][]>(new TValue[5][]);
+        private int leadingCount = -1;
+        private int lastCount = 0;
+        private readonly int innerSize = 20;
+        private readonly int outerStep = 5;
 
         public int Count
         {
             get
             {
-                return actionChainer.Run(() => backing.Count);
+                var lastCountCache = Volatile.Read(ref lastCount);
+                while (Has(lastCountCache))
+                {
+                    Interlocked.CompareExchange(ref lastCount, lastCountCache+1, lastCountCache);
+                    lastCountCache = Volatile.Read(ref lastCount);
+                }
+                return lastCount;
+
+
             }
         }
 
-        public void Update(int index, Func<TValue, TValue> func)
+        public bool Has(int i)
         {
-            backing[index].Do(x => x.Set(func(x.Get())));
-        }
-
-        public void Add(TValue value)
-        {
-            actionChainer.Run(() =>
+            try
             {
-                var entry = new ItemShell(value, actionChainer.GetActionChainer());
-                backing.Add(entry);
-            });
+                var myOuterIndex = i / innerSize;
+                var myInnerIndex = i % innerSize;
+                return backing.Value[myOuterIndex][myInnerIndex] != null;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public TValue this[int index]
         {
-            get { return backing[index].Get(); }
-            set { backing[index].Do(x => x.Set(value)); }
+            get
+            {
+                if (TryGet(index, out var res))
+                {
+                    return res;
+                }
+                throw new IndexOutOfRangeException();
+            }
         }
 
-        private class ItemShell
+        public void EnqueAdd(TValue value)
         {
-            private readonly Item item;
-            private readonly IActionChainer actionChainer;
-
-            public ItemShell(TValue value, IActionChainer actionChainer)
+            var myIndex = Interlocked.Increment(ref leadingCount);
+            var myOuterIndex = myIndex / innerSize;
+            var myInnerIndex = myIndex % innerSize;
+            if (backing.Value.Length <= myOuterIndex)
             {
-                item = new Item(value);
-                this.actionChainer = actionChainer;
-            }
-
-            public TValue Get()
-            {
-                return item.Get();
-            }
-
-            public class Item
-            {
-                public Item(TValue value)
+                // expand
+                backing.Do(x =>
                 {
-                    this.value = value;
-                }
-
-                // this wishes it could be volitile
-                private object value;
-
-                public TValue Get()
-                {
-                    // reads are atomic so this is ok 
-                    return (TValue)Volatile.Read(ref value);
-                }
-                public void Set(TValue value)
-                {
-                    Volatile.Write(ref this.value, value);
-                }
+                    if (backing.Value.Length <= myOuterIndex)
+                    {
+                        var replace = new TValue[backing.Value.Length + outerStep][];
+                        for (int i = 0; i < backing.Value.Length; i++)
+                        {
+                            replace[i] = backing.Value[i];
+                        }
+                        x.Value = replace;
+                    }
+                });
             }
-
-            internal void Do(Action<Item> action)
-            {
-                actionChainer.Run(() => action(item));
-            }
-
-            internal TOut Do<TOut>(Func<Item, TOut> function)
-            {
-                return actionChainer.Run(() => function(item));
-            }
+            Interlocked.CompareExchange(ref backing.Value[myOuterIndex], new TValue[innerSize], null);
+            backing.Value[myOuterIndex][myInnerIndex] = value;
+            Interlocked.CompareExchange(ref lastCount, myIndex+1, myIndex);
         }
 
-        public void AddSet(IEnumerable<TValue> collection)
+        public bool TryGet(int i, out TValue value)
         {
-            actionChainer.Run(() =>
-            {
-                foreach (var value in collection)
-                {
-                    var entry = new ItemShell(value, actionChainer.GetActionChainer());
-                    backing.Add(entry);
-                }
-            });
-        }
-
-        public TValue[] ToArray()
-        {
-            return actionChainer.Run(() => backing.Select(x => x.Get()).ToArray());
-        }
-
-        public bool Contains<T>(T t)
-        {
-            if (t == null)
-            {
-                return actionChainer.Run(() => backing.Any(x => x.Get() == null));
+            try { 
+                var myOuterIndex = i / innerSize;
+                var myInnerIndex = i % innerSize;
+                value = backing.Value[myOuterIndex][myInnerIndex];
+                return value != null;
             }
-            return actionChainer.Run(() => backing.Any(x => t.Equals(x.Get())));
-        }
-
-        public IEnumerator<TValue> GetEnumerator() {
-            var count = Count;
-            int i = 0;
-            while (i < Count)
+            catch
             {
-                for (; i < count; i++)
-                {
-                    yield return this[i];
-                }
-                count = Count;
+                value = default;
+                return false;
             }
         }
 
+        public IEnumerator<TValue> GetEnumerator()
+        {
+            for (int i = 0; i < Count; i++)
+            {
+                yield return this[i];
+            }
+        }
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
+    public class ConcurrentArrayArray<TValue> : IReadOnlyList<TValue>
+    {
+        private readonly RawConcurrentArrayArray<Concurrent<TValue>> backing = new RawConcurrentArrayArray<Concurrent<TValue>>();
+        private const long enumerationAdd = 1_000_000_000;
+        private long enumerationCount = 0;
+
+
+        public ConcurrentArrayArray()
+        {
+        }
+
+        public ConcurrentArrayArray(IEnumerable<TValue> items)
+        {
+            // this could probably be optimized...
+            this.EnqueAddSet(items);
+        }
+
+        private void NoModificationDuringEnumeration()
+        {
+            var res = Interlocked.Increment(ref enumerationCount);
+            if (res >= enumerationAdd)
+            {
+                throw new Exception("No modification during enumeration");
+            }
+        }
+
+        public bool TryGet(int i, out TValue value)
+        {
+            try
+            {
+                if (backing.TryGet(i, out var res))
+                {
+                    value = res.Value;
+                    return true;
+                }
+                value = default;
+                return false;
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
+        public bool TrySet(int i, TValue value)
+        {
+            try
+            {
+                NoModificationDuringEnumeration();
+                if (backing.TryGet(i, out var res))
+                {
+                    res.Do(x => x.Value = value);
+                    return true;
+                }
+                value = default;
+                return false;
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
+        public bool TryDo(int i, Action<Concurrent<TValue>.ValueHolder> action)
+        {
+            try
+            {
+                NoModificationDuringEnumeration();
+                if (backing.TryGet(i, out var res))
+                {
+                    res.Do(action);
+                    return true;
+                }
+                return false;
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
+        public bool TryDo<TOut>(int i, Func<Concurrent<TValue>.ValueHolder, TOut> func, out TOut result)
+        {
+            try
+            {
+                NoModificationDuringEnumeration();
+                if (backing.TryGet(i, out var res))
+                {
+                    result = res.Do(func);
+                    return true;
+                }
+                result = default;
+                return false;
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
+        public void EnqueAdd(TValue value)
+        {
+            try
+            {
+                NoModificationDuringEnumeration();
+                backing.EnqueAdd(new Concurrent<TValue>(value));
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
+
+        public TValue this[int index]
+        {
+            get
+            {
+                if (TryGet(index, out var res))
+                {
+                    return res;
+                }
+                throw new IndexOutOfRangeException();
+            }
+            set
+            {
+                if (TrySet(index, value))
+                {
+                    return;
+                }
+                throw new IndexOutOfRangeException();
+            }
+        }
+
+        public int Count => backing.Count;
+
+        public IEnumerator<TValue> GetEnumerator()
+        {
+            Interlocked.Add(ref enumerationCount, enumerationAdd);
+            while (Volatile.Read(ref enumerationCount) % enumerationAdd != 0)
+            {
+                // TODO do tasks?
+            }
+            foreach (var item in backing)
+            {
+                yield return item.Value;
+            }
+            Interlocked.Add(ref enumerationCount, -enumerationAdd);
+        }
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
+    public static class ConcurrentArrayArrayExtensions
+    {
+        public static void Update<TValue>(this ConcurrentArrayArray<TValue> self, int index, Func<TValue, TValue> func)
+        {
+            if (self.TryDo(index, x => x.Value = func(x.Value)))
+            {
+                return;
+            }
+            throw new IndexOutOfRangeException();
+        }
+        public static void EnqueAddSet<TValue>(this ConcurrentArrayArray<TValue> self, IEnumerable<TValue> collection)
+        {
+            foreach (var item in collection)
+            {
+                self.EnqueAdd(item);
+            }
+        }
     }
 }

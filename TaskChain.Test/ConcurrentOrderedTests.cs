@@ -11,7 +11,7 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public async Task AddStuff()
         {
-            var student = new ConcurrentOrdered<int>();
+            var student = new ConcurrentArrayArray<int>();
 
             var tasks = new List<Task>();
             for (var i = 0; i < 20; i++)
@@ -21,7 +21,7 @@ namespace Prototypist.TaskChain.Test
                     var r = new Random(i);
                     for (var j = 0; j < 100; j++)
                     {
-                        student.Add(r.Next(0, 100));
+                        student.EnqueAdd(r.Next(0, 100));
                     }
                 }));
             }
@@ -32,9 +32,24 @@ namespace Prototypist.TaskChain.Test
         }
 
         [Fact]
+        public void SimpleAddStuff()
+        {
+            var student = new ConcurrentArrayArray<int>();
+
+
+            var r = new Random();
+            for (var j = 0; j < 100; j++)
+            {
+                student.EnqueAdd(r.Next(0, 100));
+            }
+
+            Assert.Equal(100, student.Count);
+        }
+
+        [Fact]
         public void Scramble()
         {
-            var student = new ConcurrentOrdered<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
+            var student = new ConcurrentArrayArray<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
 
             Parallel.For(0, 20, (i) =>
             {
@@ -49,22 +64,23 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void UpdateAndIterate()
         {
-            var student = new ConcurrentOrdered<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
+            var student = new ConcurrentArrayArray<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
 
-            // this just need to not throw
-            foreach (var item in student.ToArray())
+            Assert.ThrowsAny<Exception>(() =>
             {
-                student[0] = item;
-            }
-
+                foreach (var item in student)
+                {
+                    student[0] = item;
+                }
+            });
         }
 
         [Fact]
         public void ReadAndIterate()
         {
-            var student = new ConcurrentOrdered<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
+            var student = new ConcurrentArrayArray<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
 
-            foreach (var item in student.ToArray())
+            foreach (var item in student)
             {
                 var harmless = student[0];
             }
@@ -74,12 +90,12 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void DoubleIterate()
         {
-            var student = new ConcurrentOrdered<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
+            var student = new ConcurrentArrayArray<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
             var count = 0;
 
-            foreach (var x in student.ToArray())
+            foreach (var x in student)
             {
-                foreach (var y in student.ToArray())
+                foreach (var y in student)
                 {
                     count++;
                 }
