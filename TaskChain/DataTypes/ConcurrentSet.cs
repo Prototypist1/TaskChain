@@ -64,60 +64,7 @@ namespace Prototypist.TaskChain.DataTypes
                 at = at.next;
             };
         }
-
-        public void AddOrThrow(IndexedListNode<TKey, TValue> node)
-        {
-            var hash = Math.Abs(Math.Max(-int.MaxValue, node.key.GetHashCode()));
-            var a = hash % 64;
-            var b = (hash % 1024) / 64;
-            var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
-            if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], node, null) == null)
-            {
-                return;
-            }
-            var at = tree.backing[a].backing[b].backing[c];
-            while (true)
-            {
-                if (object.Equals(at.key, node.key))
-                {
-                    throw new Exception($"item already added: {node.key}");
-                }
-                if (Interlocked.CompareExchange(ref at.next, node, null) == null)
-                {
-                    return;
-                }
-                at = at.next;
-            };
-        }
-
-        public bool TryAdd(IndexedListNode<TKey, TValue> node)
-        {
-            var hash = Math.Abs(Math.Max(-int.MaxValue, node.key.GetHashCode()));
-            var a = hash % 64;
-            var b = (hash % 1024) / 64;
-            var c = (hash % 4096) / 1024;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
-            if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], node, null) == null)
-            {
-                return true;
-            }
-            var at = tree.backing[a].backing[b].backing[c];
-            while (true)
-            {
-                if (object.Equals(at.value, node.key))
-                {
-                    return false;
-                }
-                if (Interlocked.CompareExchange(ref at.next, node, null) == null)
-                {
-                    return true;
-                }
-                at = at.next;
-            };
-        }
+        
 
         public IEnumerator<IndexedListNode<TKey, TValue>> GetEnumerator()
         {
@@ -154,10 +101,13 @@ namespace Prototypist.TaskChain.DataTypes
     public class ConcurrentSet<T> : IEnumerable<T>
     {
         private readonly ConcurrentHashIndexedTree<T, BuildableConcurrent<T>> backing = new ConcurrentHashIndexedTree<T, BuildableConcurrent<T>>();
-        private int enumerationCount=0;
+        private const long enumerationAdd = 1_000_000_000;
+        private long enumerationCount =0;
 
         private void NoModificationDuringEnumeration() {
-            if (Volatile.Read(ref enumerationCount) != 0) {
+            var res = Interlocked.Increment(ref enumerationCount);
+            if (res >= enumerationAdd)
+            {
                 throw new Exception("No modification during enumeration");
             }
         }
@@ -169,40 +119,66 @@ namespace Prototypist.TaskChain.DataTypes
 
         protected T GetOrAdd(T value)
         {
-            NoModificationDuringEnumeration();
+            try
+            {
+                NoModificationDuringEnumeration();
 
-            return backing.GetOrAdd(new IndexedListNode<T, BuildableConcurrent<T>>(value, new BuildableConcurrent<T>(value))).Value;
+                return backing.GetOrAdd(new IndexedListNode<T, BuildableConcurrent<T>>(value, new BuildableConcurrent<T>(value))).Value;
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
 
         }
 
         protected void AddOrThrow(T value)
         {
-            NoModificationDuringEnumeration();
-            
-            backing.AddOrThrow(new IndexedListNode<T, BuildableConcurrent<T>>(value, new BuildableConcurrent<T>(value)));
+            try
+            {
+                NoModificationDuringEnumeration();
+                var toAdd = new IndexedListNode<T, BuildableConcurrent<T>>(value, new BuildableConcurrent<T>(value));
+                var res = backing.GetOrAdd(toAdd);
+                if (!object.ReferenceEquals(res, toAdd)){
+                    throw new Exception("Item already added");
+                }
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
         }
 
         protected bool TryAdd(T value)
         {
-            NoModificationDuringEnumeration();
-
-            return backing.TryAdd(new IndexedListNode<T, BuildableConcurrent<T>>(value, new BuildableConcurrent<T>(value)));
+            try
+            {
+                NoModificationDuringEnumeration();
+                var toAdd = new IndexedListNode<T, BuildableConcurrent<T>>(value, new BuildableConcurrent<T>(value));
+                var res = backing.GetOrAdd(toAdd);
+                return object.ReferenceEquals(res, toAdd);
+            }
+            finally {
+                Interlocked.Decrement(ref enumerationCount);
+            }
         }
 
         public IEnumerator<T> GetEnumerator()
         {
-            Interlocked.Increment(ref enumerationCount);
+            Interlocked.Add(ref enumerationCount, enumerationAdd);
+            while (Volatile.Read(ref enumerationCount) % enumerationAdd != 0) {
+                // TODO do tasks?
+            }
             foreach (var item in backing)
             {
                 yield return item.value.Value;
             }
-            Interlocked.Decrement(ref enumerationCount);
+            Interlocked.Add(ref enumerationCount, -enumerationAdd);
         }
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
-
-
+    
     //public class ConcurrentSet<T> : IEnumerable<T>
     //{
 
