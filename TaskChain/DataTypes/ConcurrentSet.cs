@@ -175,7 +175,7 @@ namespace Prototypist.TaskChain.DataTypes
                 NoModificationDuringEnumeration();
                 var toAdd = new IndexedListNode<T, BuildableConcurrent<T>>(value, new BuildableConcurrent<T>(value));
                 var res = backing.GetOrAdd(toAdd);
-                return object.ReferenceEquals(res, toAdd);
+                return ReferenceEquals(res, toAdd);
             }
             finally {
                 Interlocked.Decrement(ref enumerationCount);

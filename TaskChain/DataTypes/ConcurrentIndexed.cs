@@ -153,6 +153,23 @@ namespace Prototypist.TaskChain.DataTypes
                 Interlocked.Decrement(ref enumerationCount);
             }
         }
+        public void AddOrThrow(TKey key, TValue fallback)
+        {
+            try
+            {
+                NoModificationDuringEnumeration();
+                var toAdd = new IndexedListNode<TKey, BuildableConcurrent<TValue>>(key, new BuildableConcurrent<TValue>(fallback));
+                var current = backing.GetOrAdd(toAdd);
+                if (!ReferenceEquals(current, toAdd))
+                {
+                    throw new Exception("Item already exits");
+                }
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
         public void DoOrAdd(TKey key, Action<Concurrent<TValue>.ValueHolder> action, TValue fallback) {
             try
             {
@@ -161,7 +178,7 @@ namespace Prototypist.TaskChain.DataTypes
                 var current = backing.GetOrAdd(toAdd);
                 if (!ReferenceEquals(current, toAdd))
                 {
-                    toAdd.value.Do(action);
+                    current.value.Do(action);
                 }
             }
             finally
@@ -181,7 +198,7 @@ namespace Prototypist.TaskChain.DataTypes
                 }
                 else
                 {
-                    toAdd.value.Do(action);
+                    current.value.Do(action);
                 }
             }
             finally
@@ -198,7 +215,7 @@ namespace Prototypist.TaskChain.DataTypes
                 var current = backing.GetOrAdd(toAdd);
                 if (!ReferenceEquals(current, toAdd))
                 {
-                    res = toAdd.value.Do(function);
+                    res = current.value.Do(function);
                     return true;
                 }
                 res = default;
@@ -224,7 +241,7 @@ namespace Prototypist.TaskChain.DataTypes
                 }
                 else
                 {
-                    res = toAdd.value.Do(function);
+                    res = current.value.Do(function);
                     return true;
                 }
             }
@@ -253,12 +270,12 @@ namespace Prototypist.TaskChain.DataTypes
             {
                 NoModificationDuringEnumeration();
                 var toAdd = new IndexedListNode<TKey, BuildableConcurrent<TValue>>(key, new BuildableConcurrent<TValue>());
-                var current = backing.GetOrAdd(toAdd);
-                if (ReferenceEquals(current, toAdd))
+                var res = backing.GetOrAdd(toAdd);
+                if (ReferenceEquals(res,toAdd))
                 {
                     toAdd.value.Build(fallback());
                 }
-                return toAdd.value.Do(function);
+                return res.value.Do(function);
             }
             finally
             {
@@ -310,19 +327,25 @@ namespace Prototypist.TaskChain.DataTypes
             }
             throw new Exception("No item found for that key");
         }
-        public static void AddOrThrow<TKey, TValue>(this ConcurrentHashIndexedTree<TKey, TValue> self, TKey key, TValue value) {
-            var res = self.GetOrAdd(key, value);
-            if (!ReferenceEquals(res, value))
+        //public static void AddOrThrow<TKey, TValue>(this ConcurrentHashIndexedTree<TKey, TValue> self, TKey key, TValue value) {
+        //    var res = self.TryAdd(key, value);
+        //    if (!res)
+        //    {
+        //        throw new Exception("No item found for that key");
+        //    }
+        //}
+        public static bool TryAdd<TKey, TValue>(this ConcurrentHashIndexedTree<TKey, TValue> self, TKey key, TValue value) {
+            try
             {
-                throw new Exception("No item found for that key");
+                self.AddOrThrow(key, value);
+                return true;
+            }
+            catch {
+                return false;
             }
         }
-        public static bool TryAdd<TKey, TValue>(this ConcurrentHashIndexedTree<TKey, TValue> self, TKey key, TValue value) {
-            var res = self.GetOrAdd(key, value);
-            return ReferenceEquals(res, value);
-        }
         public static TValue UpdateOrAdd<TKey, TValue>(this ConcurrentHashIndexedTree<TKey, TValue> self, TKey key, Func<TValue, TValue> function, TValue fallback) {
-            var res = default(TValue);
+            var res = fallback;
             self.DoOrAdd(key, x =>
             {
                 res = function(x.Value);
@@ -336,7 +359,10 @@ namespace Prototypist.TaskChain.DataTypes
             {
                 res = function(x.Value);
                 x.Value = res;
-            }, fallback);
+            },()=> {
+                res = fallback();
+                return res;
+                });
             return res;
         }
         public static TValue UpdateOrThrow<TKey, TValue>(this ConcurrentHashIndexedTree<TKey, TValue> self, TKey key, Func<TValue, TValue> function) {

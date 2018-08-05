@@ -26,23 +26,4 @@ namespace Prototypist.TaskChain
             this.value = value;
         }
     }
-
-    //public class SetListNode<TValue> : TreeListNode<TValue, SetListNode<TValue>>
-    //{
-    //    public SetListNode(TValue value): base(value)
-    //    {
-    //    }
-    //}
-
-    //public class IndexedListNode<TKey, TValue, TNext> : TreeListNode<TValue, TNext>
-    //    where TNext : IndexedListNode<TKey, TValue, TNext>
-    //{
-
-    //    public IndexedListNode(TKey key, TValue value): base(value)
-    //    {
-    //        this.key = key;
-    //    }
-    //}
-
-
 }
