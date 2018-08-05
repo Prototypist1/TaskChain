@@ -38,7 +38,7 @@ namespace Prototypist.TaskChain.DataTypes
                 Interlocked.Decrement(ref enumerationCount);
             }
         }
-        public bool SetIfExists(TKey key, TValue newValue)
+        public bool UpdateOrThrow(TKey key, TValue newValue)
         {
             try
             {
@@ -95,7 +95,7 @@ namespace Prototypist.TaskChain.DataTypes
                 NoModificationDuringEnumeration();
                 var toAdd = new IndexedListNode<TKey, BuildableConcurrent<TValue>>(key, new BuildableConcurrent<TValue>(value));
                 var item = backing.GetOrAdd(toAdd);
-                item.Do(x => x.Value = value);
+                item.value.Do(x => x.Value = value);
             }
             finally
             {
@@ -107,7 +107,7 @@ namespace Prototypist.TaskChain.DataTypes
             {
                 NoModificationDuringEnumeration();
                 var toAdd = new IndexedListNode<TKey, BuildableConcurrent<TValue>>(key, new BuildableConcurrent<TValue>(fallback));
-                return backing.GetOrAdd(toAdd).Value;
+                return backing.GetOrAdd(toAdd).value.Value;
             }
             finally
             {
@@ -123,7 +123,7 @@ namespace Prototypist.TaskChain.DataTypes
                 if (ReferenceEquals(current, toAdd)) {
                     toAdd.value.Build(fallback());
                 }
-                return current.Value;
+                return current.value.Value;
             }
             finally
             {
@@ -339,7 +339,5 @@ namespace Prototypist.TaskChain.DataTypes
             }
             throw new Exception("No item found for that key");
         }
-
-
     }
 }

@@ -37,8 +37,6 @@ namespace Prototypist.TaskChain.DataTypes
             }
             return false;
         }
-
-
         private IndexedListNode<TKey, TValue> GetNodeOrThrow(TKey key)
         {
             var hash = Math.Abs(Math.Max(-int.MaxValue, key.GetHashCode()));
@@ -47,8 +45,7 @@ namespace Prototypist.TaskChain.DataTypes
             var c = (hash % 4096) / 1024;
             return tree.backing[a].backing[b].backing[c];
         }
-
-        public TValue GetOrAdd(IndexedListNode<TKey, TValue> node)
+        public IndexedListNode<TKey, TValue> GetOrAdd(IndexedListNode<TKey, TValue> node)
         {
             var hash = Math.Abs(Math.Max(-int.MaxValue, node.key.GetHashCode()));
             var a = hash % 64;
@@ -58,23 +55,22 @@ namespace Prototypist.TaskChain.DataTypes
             Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
             if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], node, null) == null)
             {
-                return node.value;
+                return node;
             }
             var at = tree.backing[a].backing[b].backing[c];
             while (true)
             {
                 if (object.Equals(at.key, node.key))
                 {
-                    return at.value;
+                    return at;
                 }
                 if (Interlocked.CompareExchange(ref at.next, node, null) == null)
                 {
-                    return node.value;
+                    return node;
                 }
                 at = at.next;
             };
         }
-
         public bool TryGet(TKey key, out TValue res)
         {
             try
@@ -88,8 +84,7 @@ namespace Prototypist.TaskChain.DataTypes
                 return false;
             }
         }
-
-
+        
         public IEnumerator<IndexedListNode<TKey, TValue>> GetEnumerator()
         {
             foreach (var l1 in tree.backing)
@@ -117,9 +112,7 @@ namespace Prototypist.TaskChain.DataTypes
                 }
             }
         }
-
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-        
     }
 
     public class ConcurrentSet<T> : IEnumerable<T>
@@ -143,13 +136,13 @@ namespace Prototypist.TaskChain.DataTypes
 
         // TODO some of these are extensions
 
-        protected T GetOrAdd(T value)
+        public T GetOrAdd(T value)
         {
             try
             {
                 NoModificationDuringEnumeration();
 
-                return backing.GetOrAdd(new IndexedListNode<T, BuildableConcurrent<T>>(value, new BuildableConcurrent<T>(value))).Value;
+                return backing.GetOrAdd(new IndexedListNode<T, BuildableConcurrent<T>>(value, new BuildableConcurrent<T>(value))).value.Value;
             }
             finally
             {
@@ -158,7 +151,7 @@ namespace Prototypist.TaskChain.DataTypes
 
         }
 
-        protected void AddOrThrow(T value)
+        public void AddOrThrow(T value)
         {
             try
             {
@@ -175,7 +168,7 @@ namespace Prototypist.TaskChain.DataTypes
             }
         }
 
-        protected bool TryAdd(T value)
+        public bool TryAdd(T value)
         {
             try
             {
@@ -204,4 +197,5 @@ namespace Prototypist.TaskChain.DataTypes
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
+    
 }

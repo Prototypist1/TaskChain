@@ -11,19 +11,11 @@ namespace Prototypist.TaskChain.Test
 
             Assert.False(target.Contains(1));
 
-            target.ContainsOrAdd(1);
+            target.TryAdd(1);
 
             Assert.True(target.Contains(1));
         }
-
-        [Fact]
-        public void ContainsOrAdd()
-        {
-            var target = new ConcurrentSet<int>();
-
-            Assert.False(target.ContainsOrAdd(1));
-            Assert.True(target.ContainsOrAdd(1));
-        }
+        
 
         [Fact]
         public void TryAdd()
