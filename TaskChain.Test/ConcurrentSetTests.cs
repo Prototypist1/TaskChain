@@ -16,7 +16,6 @@ namespace Prototypist.TaskChain.Test
             Assert.True(target.Contains(1));
         }
         
-
         [Fact]
         public void TryAdd()
         {
