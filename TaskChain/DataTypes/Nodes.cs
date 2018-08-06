@@ -16,6 +16,7 @@ namespace Prototypist.TaskChain
 
     public class IndexedListNode<TKey, TValue>
     {
+        public readonly int hash;
         public readonly TKey key;
         public readonly TValue value;
         public IndexedListNode<TKey, TValue> next;
@@ -24,6 +25,7 @@ namespace Prototypist.TaskChain
         {
             this.key = key;
             this.value = value;
+            this.hash = key.GetHashCode();
         }
     }
 }

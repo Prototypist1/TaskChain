@@ -11,7 +11,7 @@ namespace Prototypist.TaskChain.DataTypes
 
     public class ConcurrentHashIndexedTree<TKey, TValue> :  IEnumerable<KeyValuePair<TKey, TValue>>
     {
-        private readonly RawConcurrentHashIndexedTree<TKey, BuildableConcurrent<TValue>> backing = new RawConcurrentHashIndexedTree<TKey, BuildableConcurrent<TValue>>();
+        private readonly RawConcurrentHashIndexedTree<TKey, Concurrent<TValue>> backing = new RawConcurrentHashIndexedTree<TKey, Concurrent<TValue>>();
         private const long enumerationAdd = 1_000_000_000;
         private long enumerationCount = 0;
 
@@ -24,23 +24,23 @@ namespace Prototypist.TaskChain.DataTypes
             }
         }
 
+        public bool ContainsKey(TKey key) {
+            return backing.Contains(key);
+        }
+
         public bool TryGet(TKey key, out TValue res)
         {
             try
             {
-                NoModificationDuringEnumeration();
-                if (backing.TryGet(key, out var item)) {
-                    res = item.Value;
-                    return true;
-                }
+                res = backing.GetNodeOrThrow(key).value.Value;
+                return true;
+            }
+            catch {
                 res = default;
                 return false;
             }
-            finally
-            {
-                Interlocked.Decrement(ref enumerationCount);
-            }
         }
+
         public bool TryUpdate(TKey key, TValue newValue)
         {
             try
@@ -96,7 +96,7 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new IndexedListNode<TKey, BuildableConcurrent<TValue>>(key, new BuildableConcurrent<TValue>(value));
+                var toAdd = new IndexedListNode<TKey, Concurrent<TValue>>(key, new Concurrent<TValue>(value));
                 var item = backing.GetOrAdd(toAdd);
                 item.value.Do(x => x.Value = value);
             }
@@ -109,7 +109,7 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new IndexedListNode<TKey, BuildableConcurrent<TValue>>(key, new BuildableConcurrent<TValue>(fallback));
+                var toAdd = new IndexedListNode<TKey, Concurrent<TValue>>(key, new Concurrent<TValue>(fallback));
                 return backing.GetOrAdd(toAdd).value.Value;
             }
             finally
@@ -121,10 +121,11 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new IndexedListNode<TKey, BuildableConcurrent<TValue>>(key, new BuildableConcurrent<TValue>());
+                var buildable = new BuildableConcurrent<TValue>();
+                var toAdd = new IndexedListNode<TKey, Concurrent<TValue>>(key, buildable);
                 var current = backing.GetOrAdd(toAdd);
                 if (ReferenceEquals(current, toAdd)) {
-                    toAdd.value.Build(fallback());
+                    buildable.Build(fallback());
                 }
                 return current.value.Value;
             }
@@ -138,11 +139,12 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new IndexedListNode<TKey, BuildableConcurrent<TValue>>(key, new BuildableConcurrent<TValue>());
+                var buildable = new BuildableConcurrent<TValue>();
+                var toAdd = new IndexedListNode<TKey, Concurrent<TValue>>(key, buildable);
                 var current = backing.GetOrAdd(toAdd);
                 if (ReferenceEquals(current, toAdd))
                 {
-                    toAdd.value.Build(fallback());
+                    buildable.Build(fallback());
                 }
                 else {
                     throw new Exception("Item already exits");
@@ -158,7 +160,7 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new IndexedListNode<TKey, BuildableConcurrent<TValue>>(key, new BuildableConcurrent<TValue>(fallback));
+                var toAdd = new IndexedListNode<TKey, Concurrent<TValue>>(key, new Concurrent<TValue>(fallback));
                 var current = backing.GetOrAdd(toAdd);
                 if (!ReferenceEquals(current, toAdd))
                 {
@@ -174,7 +176,7 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new IndexedListNode<TKey, BuildableConcurrent<TValue>>(key, new BuildableConcurrent<TValue>(fallback));
+                var toAdd = new IndexedListNode<TKey, Concurrent<TValue>>(key, new Concurrent<TValue>(fallback));
                 var current = backing.GetOrAdd(toAdd);
                 if (!ReferenceEquals(current, toAdd))
                 {
@@ -190,11 +192,12 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new IndexedListNode<TKey, BuildableConcurrent<TValue>>(key, new BuildableConcurrent<TValue>());
+                var buildable = new BuildableConcurrent<TValue>();
+                var toAdd = new IndexedListNode<TKey, Concurrent<TValue>>(key, buildable);
                 var current = backing.GetOrAdd(toAdd);
                 if (ReferenceEquals(current, toAdd))
                 {
-                    toAdd.value.Build(fallback());
+                    buildable.Build(fallback());
                 }
                 else
                 {
@@ -211,7 +214,7 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new IndexedListNode<TKey, BuildableConcurrent<TValue>>(key, new BuildableConcurrent<TValue>(fallback));
+                var toAdd = new IndexedListNode<TKey, Concurrent<TValue>>(key, new Concurrent<TValue>(fallback));
                 var current = backing.GetOrAdd(toAdd);
                 if (!ReferenceEquals(current, toAdd))
                 {
@@ -231,11 +234,12 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new IndexedListNode<TKey, BuildableConcurrent<TValue>>(key, new BuildableConcurrent<TValue>());
+                var buildable = new BuildableConcurrent<TValue>();
+                var toAdd = new IndexedListNode<TKey, Concurrent<TValue>>(key, buildable);
                 var current = backing.GetOrAdd(toAdd);
                 if (ReferenceEquals(current, toAdd))
                 {
-                    toAdd.value.Build(fallback());
+                    buildable.Build(fallback());
                     res = default;
                     return false;
                 }
@@ -255,7 +259,7 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new IndexedListNode<TKey, BuildableConcurrent<TValue>>(key, new BuildableConcurrent<TValue>(fallback));
+                var toAdd = new IndexedListNode<TKey, Concurrent<TValue>>(key, new Concurrent<TValue>(fallback));
                 var current = backing.GetOrAdd(toAdd);
                 return toAdd.value.Do(function);
             }
@@ -269,11 +273,12 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new IndexedListNode<TKey, BuildableConcurrent<TValue>>(key, new BuildableConcurrent<TValue>());
+                var buildable = new BuildableConcurrent<TValue>();
+                var toAdd = new IndexedListNode<TKey, Concurrent<TValue>>(key, buildable);
                 var res = backing.GetOrAdd(toAdd);
                 if (ReferenceEquals(res,toAdd))
                 {
-                    toAdd.value.Build(fallback());
+                    buildable.Build(fallback());
                 }
                 return res.value.Do(function);
             }

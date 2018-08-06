@@ -33,17 +33,17 @@ namespace Prototypist.TaskChain.DataTypes
         {
             get
             {
-                return (TValue)Volatile.Read(ref value);
+                return value;
             }
             protected set
             {
-                Volatile.Write(ref this.value, value);
+                this.value = value;
             }
         }
 
         protected readonly IActionChainer actionChainer;
-        protected object value;
-        
+        protected TValue value;
+
         public Concurrent(TValue value, IActionChainer actionChainer)
         {
             this.value = value;
@@ -74,6 +74,8 @@ namespace Prototypist.TaskChain.DataTypes
         }
 
     }
+    
+    
 
     //public class ConcurrentListNode<TValue> : Concurrent<TValue>
     //{

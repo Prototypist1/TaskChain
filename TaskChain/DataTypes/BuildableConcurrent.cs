@@ -15,12 +15,12 @@ namespace Prototypist.TaskChain.DataTypes
             get
             {
                 taskManager.SpinUntil(() => building == FALSE || Volatile.Read(ref building) == FALSE);
-                return (TValue)Volatile.Read(ref value);
+                return value;
             }
             protected set
             {
                 taskManager.SpinUntil(() => building == FALSE || Volatile.Read(ref building) == FALSE);
-                Volatile.Write(ref this.value, value);
+                this.value= value;
             }
         }
         
