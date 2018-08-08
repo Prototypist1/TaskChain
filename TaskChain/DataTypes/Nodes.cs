@@ -63,7 +63,7 @@ namespace Prototypist.TaskChain
         public readonly TKey key;
         public ConcurrentIndexedListNode2<TKey, TValue> next;
         protected Inner<TValue> item;
-        private Inner<TValue> oldItem;
+        protected Inner<TValue> oldItem;
         protected readonly ITaskManager taskManager;
 
         public virtual TValue Value
@@ -77,7 +77,7 @@ namespace Prototypist.TaskChain
         public ConcurrentIndexedListNode2(TKey key, TValue value, ITaskManager taskManager)
         {
             this.key = key;
-            var item = new Inner<TValue> { value = value };
+            var item = new Inner<TValue> (value);
             this.item = item;
             this.oldItem = item;
             this.hash = key.GetHashCode();
@@ -87,25 +87,29 @@ namespace Prototypist.TaskChain
         public ConcurrentIndexedListNode2(TKey key, TValue value) : this(key, value, Chaining.taskManager)
         {
         }
-
-
-        public virtual void Set(TValue value)
+        
+        public void Set(TValue value)
         {
-            var myItem = new Inner<TValue> { value = value };
-            taskManager.SpinUntil(() =>
-                {
-                    var localOldItem = oldItem;
-                    if (Interlocked.CompareExchange(ref item, myItem, localOldItem) == localOldItem)
-                    {
-                        oldItem = myItem;
-                        return true;
-                    }
-                    return false;
-                });
+            //lock (item)
+            //{
+            //    item.value = value;
             //}
+
+            //var myItem = new Inner<TValue> { value = value };
+            //taskManager.SpinUntil(() =>
+            //{
+            //    var localOldItem = oldItem;
+            //    if (Interlocked.CompareExchange(ref item, myItem, localOldItem) == localOldItem)
+            //    {
+            //        oldItem = myItem;
+            //        return true;
+            //    }
+            //    return false;
+            //});
+
         }
 
-        public virtual void Do(Func<TValue, TValue> action)
+        public void Do(Func<TValue, TValue> action)
         {
             var myItem = new Inner<TValue>();
 
@@ -122,7 +126,7 @@ namespace Prototypist.TaskChain
             });
         }
 
-        public virtual TRes Do<TRes>(Func<TValue, (TValue, TRes)> action)
+        public TRes Do<TRes>(Func<TValue, (TValue, TRes)> action)
         {
             var myItem = new Inner<TValue>();
             TRes res = default;
@@ -196,6 +200,7 @@ namespace Prototypist.TaskChain
         private const int TRUE = 1;
         private const int FALSE = 0;
         private int building = TRUE;
+        protected Inner<TValue> oldItemCache; 
 
         public override TValue Value
         {
@@ -206,19 +211,13 @@ namespace Prototypist.TaskChain
             }
         }
 
-        public BuildableConcurrentIndexedListNode2(TKey key, TValue value, ITaskManager taskManager) : base(key, value, taskManager)
-        {
-            building = FALSE;
-        }
 
         public BuildableConcurrentIndexedListNode2(TKey key, ITaskManager taskManager) : base(key, default, taskManager)
         {
+            this.oldItemCache = oldItem;
+            this.oldItem = new Inner<TValue>();
         }
-
-        public BuildableConcurrentIndexedListNode2(TKey key, TValue value) : this(key, value, Chaining.taskManager)
-        {
-        }
-
+        
         public BuildableConcurrentIndexedListNode2(TKey key) : this(key, Chaining.taskManager)
         {
         }
@@ -227,8 +226,7 @@ namespace Prototypist.TaskChain
         {
             this.item.value = res;
             building = FALSE;
+            this.oldItem = oldItemCache;
         }
-
-
     }
 }

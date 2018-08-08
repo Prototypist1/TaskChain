@@ -89,7 +89,6 @@ namespace Prototypist.TaskChain.DataTypes
                 }
                 return false;
             });
-
         }
 
         public virtual void Do(Func<TValue, TValue> action)

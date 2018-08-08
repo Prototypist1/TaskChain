@@ -1,11 +1,68 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
 namespace Prototypist.TaskChain.Test
 {
+    public class HowDoLocksWorkTest {
+        [Fact]
+        public void Test() {
+            var o = new object();
+
+            void lockWait() {
+                lock (o) {
+                    Thread.Sleep(1000);
+                }
+            }
+
+
+            void justWait()
+            {
+                var x = 0;
+                for (int i = 0; i < 1000000; i++)
+                {
+                    x++;
+                }
+                //Thread.Sleep(1000);
+            }
+
+            var actions = new Action[] {
+                lockWait,
+                justWait,
+                lockWait,
+                justWait,
+                lockWait,
+                justWait,
+                lockWait,
+                justWait,
+                lockWait,
+                justWait,
+                lockWait,
+                justWait,
+                lockWait,
+                justWait,
+                lockWait,
+                justWait,
+                lockWait,
+                justWait,
+                lockWait,
+                justWait,
+            };
+
+            var start = DateTime.Now.Ticks;
+            //100107441
+            Chaining.Run(actions);
+            
+            var stop = DateTime.Now.Ticks;
+
+            var runTicks = (stop - start) / TimeSpan.TicksPerSecond;
+
+        }
+    }
+
     public class TaskManagerTests
     {
         [Fact]

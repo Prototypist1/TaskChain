@@ -24,30 +24,29 @@ namespace Prototypist.TaskChain.DataTypes
             }
             return false;
         }
+
         public ConcurrentIndexedListNode2<TKey, TValue> GetNodeOrThrow(TKey key)
         {
             var hash = key.GetHashCode();
             var a = ((uint)hash) % Size;
             var at = tree.backing[a];
-            x:
-            if (hash == at.hash && key.Equals(at.key))
+            while (true)
             {
-                return at;
+                if (hash == at.hash && key.Equals(at.key))
+                {
+                    return at;
+                }
+                at = at.next;
             }
-            at = at.next;
-            goto x;
         }
+
         public ConcurrentIndexedListNode2<TKey, TValue> GetOrAdd(ConcurrentIndexedListNode2<TKey, TValue> node)
         {
-            var hash = node.key.GetHashCode();
+            var hash = node.hash;
             var a = ((uint)hash) % Size;
             var at = tree.backing[a]; 
-            if (at == null)
-            {
-                at = Interlocked.CompareExchange(ref tree.backing[a], node, null);
-                if (at == null) {
-                    return node;
-                }
+            if (at == null && Interlocked.CompareExchange(ref tree.backing[a], node, null) == null) {
+                return node;
             }
             while (true)
             {
@@ -55,12 +54,9 @@ namespace Prototypist.TaskChain.DataTypes
                 {
                     return at;
                 }
-                if (at.next == null)
+                if (at.next == null && Interlocked.CompareExchange(ref at.next, node, null) == null)
                 {
-                    if (Interlocked.CompareExchange(ref at.next, node, null) == null)
-                    {
-                        return node;
-                    }
+                    return node;
                 }
                 at = at.next;
             };

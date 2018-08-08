@@ -7,10 +7,10 @@ namespace Prototypist.TaskChain.Benchmark
     {
         static void Main(string[] args)
         {
-            //var summary1 = BenchmarkRunner.Run<ReadAllItems>();
-            var summary2 = BenchmarkRunner.Run<WriteAllItems>();
-            //Console.WriteLine(summary1);
-            Console.WriteLine(summary2);
+            //var summary = BenchmarkRunner.Run<ReadAllItems>();
+            //var summary = BenchmarkRunner.Run<WriteAllItems>();
+            var summary = BenchmarkRunner.Run<ParallelUpdate>();
+            Console.WriteLine(summary);
             Console.ReadLine();
         }
     }

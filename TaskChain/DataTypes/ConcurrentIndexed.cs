@@ -95,7 +95,7 @@ namespace Prototypist.TaskChain.DataTypes
         public void Set(TKey key, TValue value) {
             try
             {
-                //NoModificationDuringEnumeration();
+                NoModificationDuringEnumeration();
                 var toAdd = new ConcurrentIndexedListNode2<TKey, TValue>(key, value);
                 var item = backing.GetOrAdd(toAdd);
                 if (item != toAdd)
@@ -105,7 +105,7 @@ namespace Prototypist.TaskChain.DataTypes
             }
             finally
             {
-                //Interlocked.Decrement(ref enumerationCount);
+                Interlocked.Decrement(ref enumerationCount);
             }
         }
         public TValue GetOrAdd(TKey key, TValue fallback) {
