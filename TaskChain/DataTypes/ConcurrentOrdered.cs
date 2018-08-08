@@ -71,7 +71,7 @@ namespace Prototypist.TaskChain.DataTypes
                     if (backing.Value.Length <= myOuterIndex)
                     {
                         var replace = new TValue[backing.Value.Length + outerStep][];
-                        for (int i = 0; i < backing.Value.Length; i++)
+                        for (var i = 0; i < backing.Value.Length; i++)
                         {
                             replace[i] = backing.Value[i];
                         }
@@ -102,7 +102,7 @@ namespace Prototypist.TaskChain.DataTypes
 
         public IEnumerator<TValue> GetEnumerator()
         {
-            for (int i = 0; i < Count; i++)
+            for (var i = 0; i < Count; i++)
             {
                 yield return this[i];
             }

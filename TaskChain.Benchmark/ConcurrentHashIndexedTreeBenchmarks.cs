@@ -23,8 +23,7 @@ namespace Prototypist.TaskChain.Benchmark
 
         public override bool Equals(object obj)
         {
-            var test = obj as HashTest2;
-            return test != null &&
+            return obj is HashTest2 test &&
                    x == test.x &&
                    y == test.y;
         }
@@ -39,7 +38,7 @@ namespace Prototypist.TaskChain.Benchmark
 
     public class HashTest
     {
-        private int hashCode;
+        private readonly int hashCode;
         private int nature;
 
         public HashTest(int hashCode, int nature)
@@ -50,8 +49,7 @@ namespace Prototypist.TaskChain.Benchmark
 
         public override bool Equals(object obj)
         {
-            var test = obj as HashTest;
-            return test != null &&
+            return obj is HashTest test &&
                    nature == test.nature;
         }
 
@@ -89,13 +87,13 @@ namespace Prototypist.TaskChain.Benchmark
 
 
             concurrentHashIndexedTree2 = new ConcurrentHashIndexedTree<HashTest, int>();
-            for (int i = 1; i <= Items; i++)
+            for (var i = 1; i <= Items; i++)
             {
                 concurrentHashIndexedTree2.GetOrAdd(new HashTest(1, i), i);
             }
 
             concurrentDictionary2 = new ConcurrentDictionary<HashTest, int>();
-            for (int i = 1; i <= Items; i++)
+            for (var i = 1; i <= Items; i++)
             {
                 concurrentDictionary2.GetOrAdd(new HashTest(1, i), i);
             }
@@ -103,15 +101,19 @@ namespace Prototypist.TaskChain.Benchmark
             rawConcurrentHashIndexed = new RawConcurrentHashIndexed<int, int>();
             rawConcurrentHashIndexed.GetOrAdd(new ConcurrentIndexedListNode2<int, int>(1, 1));
 
-            dict = new Dictionary<int, int>();
-            dict[1] = 1;
+            dict = new Dictionary<int, int>
+            {
+                [1] = 1
+            };
 
             concurrentHashIndexedTree = new ConcurrentHashIndexedTree<int, int>();
             concurrentHashIndexedTree.Set(1, 1);
             //concurrentHashIndexedTree.GetOrAdd(new IndexedListNode<int, Concurrent<int>>(1, new Concurrent<int>(1)));
             //concurrentHashIndexedTree.GetOrAdd(new IndexedListNode<int, int>(1,1));
-            concurrentDictionary = new ConcurrentDictionary<int, int>();
-            concurrentDictionary[1] = 1;
+            concurrentDictionary = new ConcurrentDictionary<int, int>
+            {
+                [1] = 1
+            };
             //var r = new Random((int)DateTime.Now.Ticks);
             //data = new Tuple<int, int>[Threads][];
             //for (int i = 0; i < Threads; i++)
@@ -126,13 +128,13 @@ namespace Prototypist.TaskChain.Benchmark
         }
 
         //[Benchmark]
-        public void a()
+        public void A()
         {
             rawConcurrentHashIndexed.GetNodeOrThrow(1);
         }
 
         //[Benchmark]
-        public void b()
+        public void B()
         {
             dict.TryGetValue(1, out var _);
         }

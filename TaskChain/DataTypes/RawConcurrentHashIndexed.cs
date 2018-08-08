@@ -6,7 +6,7 @@ namespace Prototypist.TaskChain.DataTypes
 {
     public class RawConcurrentHashIndexed<TKey, TValue> : IEnumerable<ConcurrentIndexedListNode2<TKey, TValue>>
     {
-        private const int Size = 64;
+        private const int Size = 128;
         private readonly TreeNode<ConcurrentIndexedListNode2<TKey, TValue>> tree = new TreeNode<ConcurrentIndexedListNode2<TKey, TValue>>(Size);
 
         public bool Contains(TKey key)

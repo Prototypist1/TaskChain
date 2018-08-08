@@ -11,7 +11,7 @@ namespace TaskChain.Test
     {
         public class HashTestHelper
         {
-            private int hashCode;
+            private readonly int hashCode;
             private int nature;
 
             public HashTestHelper(int hashCode, int nature)
@@ -22,8 +22,7 @@ namespace TaskChain.Test
 
             public override bool Equals(object obj)
             {
-                var test = obj as HashTestHelper;
-                return test != null &&
+                return obj is HashTestHelper test &&
                        nature == test.nature;
             }
 

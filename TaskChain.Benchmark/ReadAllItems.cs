@@ -26,9 +26,9 @@ namespace Prototypist.TaskChain.Benchmark
             random = new Random((int)DateTime.Now.Ticks);
             mine = new ConcurrentHashIndexedTree<HashTest2, string>();
             concurrentDictionary = new ConcurrentDictionary<HashTest2, string>();
-            for (int x = 1; x <= Items; x++)
+            for (var x = 1; x <= Items; x++)
             {
-                for (int y = 1; y <= Items; y++)
+                for (var y = 1; y <= Items; y++)
                 {
                     mine.GetOrAdd(new HashTest2(x, y), x + ", " + y);
                     concurrentDictionary.GetOrAdd(new HashTest2(x, y), x + ", " + y);
@@ -39,16 +39,16 @@ namespace Prototypist.TaskChain.Benchmark
         [Benchmark]
         public void Mine()
         {
-            Action read = () =>
+            void read()
             {
-                for (int i = 0; i < 1000; i++)
+                for (var i = 0; i < 1000; i++)
                 {
                     mine.TryGet(new HashTest2(random.Next(1, Items + 1), random.Next(1, Items + 1)), out var _);
                 }
-            };
+            }
 
-            List<Action> actions = new List<Action>();
-            for (int i = 0; i < Threads; i++)
+            var actions = new List<Action>();
+            for (var i = 0; i < Threads; i++)
             {
                 actions.Add(read);
             }
@@ -60,16 +60,16 @@ namespace Prototypist.TaskChain.Benchmark
         [Benchmark]
         public void ConcurrentDictionary()
         {
-            Action read = () =>
+            void read()
             {
-                for (int i = 0; i < 1000; i++)
+                for (var i = 0; i < 1000; i++)
                 {
                     concurrentDictionary.TryGetValue(new HashTest2(random.Next(1, Items + 1), random.Next(1, Items + 1)), out var _);
                 }
-            };
+            }
 
-            List<Action> actions = new List<Action>();
-            for (int i = 0; i < Threads; i++)
+            var actions = new List<Action>();
+            for (var i = 0; i < Threads; i++)
             {
                 actions.Add(read);
             }
@@ -113,7 +113,7 @@ namespace Prototypist.TaskChain.Benchmark
         {
             //Action read = () =>
             //{
-                for (int i = 0; i < 100; i++)
+                for (var i = 0; i < 100; i++)
                 {
                     mine.Set(new HashTest2(random.Next(1, Items + 1), random.Next(1, Items + 1)), "");
                 }
@@ -134,7 +134,7 @@ namespace Prototypist.TaskChain.Benchmark
         {
             //Action read = () =>
             //{
-                for (int i = 0; i < 100; i++)
+                for (var i = 0; i < 100; i++)
                 {
                     concurrentDictionary[new HashTest2(random.Next(1, Items + 1), random.Next(1, Items + 1))] = "";
                 }

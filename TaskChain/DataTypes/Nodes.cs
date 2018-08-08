@@ -201,7 +201,7 @@ namespace Prototypist.TaskChain
         {
             get
             {
-                taskManager.SpinUntil(() => building == TRUE);
+                taskManager.SpinUntil(() => building == FALSE);
                 return base.Value;
             }
         }

@@ -349,7 +349,10 @@ namespace Prototypist.TaskChain.DataTypes
         }
         public static TValue UpdateOrAdd<TKey, TValue>(this ConcurrentHashIndexedTree<TKey, TValue> self, TKey key, Func<TValue, TValue> function, TValue fallback) {
             var res = fallback;
-            self.DoOrAdd(key, x => function(x) , fallback);
+            self.DoOrAdd(key, x => {
+                res = function(x);
+                return res;
+                } , fallback);
             return res;
         }
         public static TValue UpdateOrAdd<TKey, TValue>(this ConcurrentHashIndexedTree<TKey, TValue> self, TKey key, Func<TValue, TValue> function, Func<TValue> fallback) {
