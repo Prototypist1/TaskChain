@@ -66,14 +66,10 @@ namespace Prototypist.TaskChain.DataTypes
 
         public void Set(TValue value) {
             var myItem = new Inner<TValue> { value = value };
-            var localOldItem = oldItem;
-            if (Interlocked.CompareExchange(ref item, myItem, localOldItem) == localOldItem) {
-                oldItem = myItem;
-            }
-            else {
+
                 taskManager.SpinUntil(() =>
                 {
-                    localOldItem = oldItem;
+                    var localOldItem = oldItem;
                     if (Interlocked.CompareExchange(ref item, myItem, localOldItem) == localOldItem)
                     {
                         oldItem = myItem;
@@ -81,23 +77,16 @@ namespace Prototypist.TaskChain.DataTypes
                     }
                     return false;
                 });
-            }
+            
         }
 
         public virtual void Do(Func<TValue, TValue> action)
         {
             var myItem = new Inner<TValue>();
-            var localOldItem = oldItem;
-            if (Interlocked.CompareExchange(ref item, myItem, localOldItem) == localOldItem)
-            {
-                oldItem.value = action(oldItem.value);
-                item = oldItem;
-            }
-            else
-            {
+
                 taskManager.SpinUntil(() =>
                 {
-                    localOldItem = oldItem;
+                    var localOldItem = oldItem;
                     if (Interlocked.CompareExchange(ref item, myItem, localOldItem) == localOldItem)
                     {
                         oldItem.value = action(oldItem.value);
@@ -106,38 +95,8 @@ namespace Prototypist.TaskChain.DataTypes
                     }
                     return false;
                 });
-            }
+           
         }
 
     }
-
-    //public class ConcurrentListNode<TValue> : Concurrent<TValue>
-    //{
-    //    public ConcurrentListNode<TValue> next;
-
-    //    public ConcurrentListNode( TValue value) : base(value)
-    //    {
-    //    }
-    //}
-
-    //public class BuildableConcurrentListNode<TKey, TValue> : BuildableConcurrent<TValue>
-    //{
-    //    public readonly TKey key;
-    //    public BuildableConcurrentListNode<TKey, TValue> next;
-
-    //    public BuildableConcurrentListNode(TKey key, ITaskManager taskManager) : base(taskManager)
-    //    {
-    //        this.key = key;
-    //    }
-
-    //    public BuildableConcurrentListNode(TKey key, TValue value) : base(value)
-    //    {
-    //        this.key = key;
-    //    }
-
-    //    public BuildableConcurrentListNode(TKey key,  ITaskManager taskManager, TValue value) : base(value, taskManager)
-    //    {
-    //        this.key = key;
-    //    }
-    //}
 }
