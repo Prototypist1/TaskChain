@@ -25,7 +25,7 @@ namespace Prototypist.TaskChain.DataTypes
         {
         }
 
-        public virtual void Do(Func<TValue,TValue> action)
+        public virtual void Do(Func<TValue, TValue> action)
         {
             actionChainer.Run(() =>
             {
@@ -33,7 +33,7 @@ namespace Prototypist.TaskChain.DataTypes
             });
         }
 
-        public virtual TRes Do<TRes>(Func<TValue,(TValue, TRes)> action)
+        public virtual TRes Do<TRes>(Func<TValue, (TValue, TRes)> action)
         {
             return actionChainer.Run(() =>
             {
@@ -75,38 +75,39 @@ namespace Prototypist.TaskChain.DataTypes
             }
         }
 
-        public void Set(TValue value) {
-            var myItem = new Inner<TValue> (  value );
+        public void Set(TValue value)
+        {
+            var myItem = new Inner<TValue>(value);
 
-                taskManager.SpinUntil(() =>
+            taskManager.SpinUntil(() =>
+            {
+                var localOldItem = oldItem;
+                if (Interlocked.CompareExchange(ref item, myItem, localOldItem) == localOldItem)
                 {
-                    var localOldItem = oldItem;
-                    if (Interlocked.CompareExchange(ref item, myItem, localOldItem) == localOldItem)
-                    {
-                        oldItem = myItem;
-                        return true;
-                    }
-                    return false;
-                });
-            
+                    oldItem = myItem;
+                    return true;
+                }
+                return false;
+            });
+
         }
 
         public virtual void Do(Func<TValue, TValue> action)
         {
             var myItem = new Inner<TValue>();
 
-                taskManager.SpinUntil(() =>
+            taskManager.SpinUntil(() =>
+            {
+                var localOldItem = oldItem;
+                if (Interlocked.CompareExchange(ref item, myItem, localOldItem) == localOldItem)
                 {
-                    var localOldItem = oldItem;
-                    if (Interlocked.CompareExchange(ref item, myItem, localOldItem) == localOldItem)
-                    {
-                        oldItem.value = action(oldItem.value);
-                        item = oldItem;
-                        return true;
-                    }
-                    return false;
-                });
-           
+                    oldItem.value = action(oldItem.value);
+                    item = oldItem;
+                    return true;
+                }
+                return false;
+            });
+
         }
 
     }
