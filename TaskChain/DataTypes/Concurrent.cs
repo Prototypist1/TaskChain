@@ -47,6 +47,9 @@ namespace Prototypist.TaskChain.DataTypes
     public class Inner<TValue>
     {
         public TValue value;
+
+        public Inner() { }
+        public Inner(TValue value) => this.value = value;
     }
 
     public class Concurrent2<TValue>
@@ -55,6 +58,14 @@ namespace Prototypist.TaskChain.DataTypes
         private Inner<TValue> item;
         private Inner<TValue> oldItem;
         private readonly TaskManager taskManager;
+
+        public Concurrent2(TValue value, TaskManager taskManager)
+        {
+            var item = new Inner<TValue>(value);
+            this.item = item;
+            this.item = oldItem;
+            this.taskManager = taskManager ?? throw new ArgumentNullException(nameof(taskManager));
+        }
 
         public TValue Value
         {
@@ -65,7 +76,7 @@ namespace Prototypist.TaskChain.DataTypes
         }
 
         public void Set(TValue value) {
-            var myItem = new Inner<TValue> { value = value };
+            var myItem = new Inner<TValue> (  value );
 
                 taskManager.SpinUntil(() =>
                 {
