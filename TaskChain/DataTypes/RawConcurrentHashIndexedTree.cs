@@ -4,12 +4,12 @@ using System.Threading;
 
 namespace Prototypist.TaskChain.DataTypes
 {
-    public class RawConcurrentHashIndexedTree<TKey, TValue> : IEnumerable<IndexedListNode<TKey, TValue>>
+    public class RawConcurrentHashIndexedTree<TKey, TValue> : IEnumerable<ConcurrentIndexedListNode<TKey, TValue>>
     {
         private const int Size = 64;
         private const int BSize = 1024;
         private const int CSize = 4096;
-        private readonly TreeNode<TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>> tree = new TreeNode<TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>>(Size);
+        private readonly TreeNode<TreeNode<TreeNode<ConcurrentIndexedListNode<TKey, TValue>>>> tree = new TreeNode<TreeNode<TreeNode<ConcurrentIndexedListNode<TKey, TValue>>>>(Size);
 
         public bool Contains(TKey key)
         {
@@ -38,7 +38,7 @@ namespace Prototypist.TaskChain.DataTypes
             }
             return false;
         }
-        public IndexedListNode<TKey, TValue> GetNodeOrThrow(TKey key)
+        public ConcurrentIndexedListNode<TKey, TValue> GetNodeOrThrow(TKey key)
         {
             var hash = key.GetHashCode();
             var a = ((uint)hash) % Size;
@@ -54,14 +54,14 @@ namespace Prototypist.TaskChain.DataTypes
                 at = at.next;
             };
         }
-        public IndexedListNode<TKey, TValue> GetOrAdd(IndexedListNode<TKey, TValue> node)
+        public ConcurrentIndexedListNode<TKey, TValue> GetOrAdd(ConcurrentIndexedListNode<TKey, TValue> node)
         {
             var hash = node.key.GetHashCode();
             var a = ((uint)hash) % Size;
             var b = (hash % BSize) / Size;
             var c = (hash % CSize) / BSize;
-            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<IndexedListNode<TKey, TValue>>>(16), null);
-            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<IndexedListNode<TKey, TValue>>(4), null);
+            Interlocked.CompareExchange(ref tree.backing[a], new TreeNode<TreeNode<ConcurrentIndexedListNode<TKey, TValue>>>(16), null);
+            Interlocked.CompareExchange(ref tree.backing[a].backing[b], new TreeNode<ConcurrentIndexedListNode<TKey, TValue>>(4), null);
             if (Interlocked.CompareExchange(ref tree.backing[a].backing[b].backing[c], node, null) == null)
             {
                 return node;
@@ -84,7 +84,7 @@ namespace Prototypist.TaskChain.DataTypes
         {
             try
             {
-                res = GetNodeOrThrow(key).value;
+                res = GetNodeOrThrow(key).Value;
                 return true;
             }
             catch
@@ -94,7 +94,7 @@ namespace Prototypist.TaskChain.DataTypes
             }
         }
 
-        public IEnumerator<IndexedListNode<TKey, TValue>> GetEnumerator()
+        public IEnumerator<ConcurrentIndexedListNode<TKey, TValue>> GetEnumerator()
         {
             foreach (var l1 in tree.backing)
             {

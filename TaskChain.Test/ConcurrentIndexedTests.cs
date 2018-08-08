@@ -136,10 +136,10 @@ namespace Prototypist.TaskChain.Test
         {
             var target = new ConcurrentHashIndexedTree<int, string>();
 
-            Assert.ThrowsAny<Exception>(() => target.DoOrThrow(1, x => x.Value = x.Value + "!"));
+            Assert.ThrowsAny<Exception>(() => target.DoOrThrow(1, x => x + "!"));
 
             target.AddOrThrow(1, "1");
-            target.DoOrThrow(1, x => x.Value = x.Value + "!");
+            target.DoOrThrow(1, x => x + "!");
 
             Assert.Equal("1!", target.GetOrThrow(1));
         }
@@ -149,11 +149,11 @@ namespace Prototypist.TaskChain.Test
         {
             var target = new ConcurrentHashIndexedTree<int, string>();
 
-            Assert.ThrowsAny<Exception>(() => target.DoOrThrow(1, x => x.Value + "!"));
+            Assert.ThrowsAny<Exception>(() => target.DoOrThrow(1, x => x + "!"));
 
             target.AddOrThrow(1, "1");
 
-            Assert.Equal("1!", target.DoOrThrow(1, x => x.Value + "!"));
+            Assert.Equal("1!", target.DoOrThrow(1, x => (x,x + "!")));
         }
 
         [Fact]
@@ -190,9 +190,9 @@ namespace Prototypist.TaskChain.Test
         {
             var target = new ConcurrentHashIndexedTree<int, string>();
 
-            target.DoOrAdd(1, x => x.Value = "1!", "1");
+            target.DoOrAdd(1, x => "1!", "1");
             Assert.Equal("1", target.GetOrThrow(1));
-            target.DoOrAdd(1, x => x.Value = "1!", "1");
+            target.DoOrAdd(1, x => "1!", "1");
             Assert.Equal("1!", target.GetOrThrow(1));
         }
 
@@ -249,9 +249,9 @@ namespace Prototypist.TaskChain.Test
         {
             var target = new ConcurrentHashIndexedTree<int, string>();
 
-            Assert.Equal("1!", target.DoAddIfNeeded(1, x => x.Value + "!", "1"));
+            Assert.Equal("1!", target.DoAddIfNeeded(1, x => (x,x + "!"), "1"));
             target.Set(1, "1");
-            Assert.Equal("1!", target.DoAddIfNeeded(1, x => x.Value + "!", "1"));
+            Assert.Equal("1!", target.DoAddIfNeeded(1, x => (x, x + "!"), "1"));
         }
 
         [Fact]
@@ -259,9 +259,9 @@ namespace Prototypist.TaskChain.Test
         {
             var target = new ConcurrentHashIndexedTree<int, string>();
 
-            Assert.Equal("1!", target.DoAddIfNeeded(1, x => x.Value + "!", () => "1"));
+            Assert.Equal("1!", target.DoAddIfNeeded(1, x => (x, x + "!"), () => "1"));
             target.Set(1, "1");
-            Assert.Equal("1!", target.DoAddIfNeeded(1, x => x.Value + "!", () => "1"));
+            Assert.Equal("1!", target.DoAddIfNeeded(1, x => (x, x + "!"), () => "1"));
         }
     }
 

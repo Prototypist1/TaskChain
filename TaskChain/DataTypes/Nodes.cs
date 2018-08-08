@@ -1,4 +1,5 @@
 ﻿using Prototypist.TaskChain.DataTypes;
+using System;
 using System.Threading;
 
 namespace Prototypist.TaskChain
@@ -14,18 +15,220 @@ namespace Prototypist.TaskChain
         }
     }
 
-    public class IndexedListNode<TKey, TValue>
+    public class ConcurrentIndexedListNode<TKey, TValue>
     {
         public readonly int hash;
         public readonly TKey key;
-        public readonly TValue value;
-        public IndexedListNode<TKey, TValue> next;
+        public ConcurrentIndexedListNode<TKey, TValue> next;
 
-        public IndexedListNode(TKey key, TValue value)
+        public ConcurrentIndexedListNode(TKey key, TValue value, IActionChainer actionChainer)
         {
             this.key = key;
-            this.value = value;
+            this.Value = value;
             this.hash = key.GetHashCode();
+            this.actionChainer = actionChainer;
         }
+
+        public ConcurrentIndexedListNode(TKey key, TValue value) : this(key, value, Chaining.taskManager.GetActionChainer())
+        {
+        }
+
+        public virtual TValue Value { get; protected set; }
+
+        protected readonly IActionChainer actionChainer;
+
+        public void Do(Func<TValue, TValue> action)
+        {
+            actionChainer.Run(() =>
+            {
+                Value = action(Value);
+            });
+        }
+
+        public TRes Do<TRes>(Func<TValue, (TValue, TRes)> action)
+        {
+            return actionChainer.Run(() =>
+            {
+                var x = action(Value);
+                Value = x.Item1;
+                return x.Item2;
+            });
+        }
+    }
+
+
+    public class ConcurrentIndexedListNode2<TKey, TValue>
+    {
+        public readonly int hash;
+        public readonly TKey key;
+        public ConcurrentIndexedListNode2<TKey, TValue> next;
+        protected Inner<TValue> item;
+        private Inner<TValue> oldItem;
+        protected readonly ITaskManager taskManager;
+
+        public virtual TValue Value
+        {
+            get
+            {
+                return oldItem.value;
+            }
+        }
+
+        public ConcurrentIndexedListNode2(TKey key, TValue value, ITaskManager taskManager)
+        {
+            this.key = key;
+            var item = new Inner<TValue> { value = value };
+            this.item = item;
+            this.oldItem = item;
+            this.hash = key.GetHashCode();
+            this.taskManager = taskManager;
+        }
+
+        public ConcurrentIndexedListNode2(TKey key, TValue value) : this(key, value, Chaining.taskManager)
+        {
+        }
+
+
+        public virtual void Set(TValue value)
+        {
+            var myItem = new Inner<TValue> { value = value };
+            taskManager.SpinUntil(() =>
+                {
+                    var localOldItem = oldItem;
+                    if (Interlocked.CompareExchange(ref item, myItem, localOldItem) == localOldItem)
+                    {
+                        oldItem = myItem;
+                        return true;
+                    }
+                    return false;
+                });
+            //}
+        }
+
+        public virtual void Do(Func<TValue, TValue> action)
+        {
+            var myItem = new Inner<TValue>();
+
+            taskManager.SpinUntil(() =>
+            {
+                var localOldItem = oldItem;
+                if (Interlocked.CompareExchange(ref item, myItem, localOldItem) == localOldItem)
+                {
+                    oldItem.value = action(oldItem.value);
+                    item = oldItem;
+                    return true;
+                }
+                return false;
+            });
+        }
+
+        public virtual TRes Do<TRes>(Func<TValue, (TValue, TRes)> action)
+        {
+            var myItem = new Inner<TValue>();
+            TRes res = default;
+            taskManager.SpinUntil(() =>
+            {
+                var localOldItem = oldItem;
+                if (Interlocked.CompareExchange(ref item, myItem, localOldItem) == localOldItem)
+                {
+                    var x = action(oldItem.value);
+                    oldItem.value = x.Item1;
+                    item = oldItem;
+                    res = x.Item2;
+                    return true;
+                }
+                return false;
+            });
+            return res;
+
+        }
+    }
+
+
+    public class BuildableConcurrentIndexedListNode<TKey, TValue> : ConcurrentIndexedListNode<TKey, TValue>
+    {
+        private const int TRUE = 1;
+        private const int FALSE = 0;
+        private int building = TRUE;
+        private readonly ITaskManager taskManager;
+
+        public override TValue Value
+        {
+            get
+            {
+                taskManager.SpinUntil(() => building == TRUE);
+                return base.Value;
+            }
+            protected set => base.Value = value;
+        }
+
+        public BuildableConcurrentIndexedListNode(TKey key, TValue value, ITaskManager taskManager) : base(key, value, taskManager.GetActionChainer())
+        {
+            building = FALSE;
+            this.taskManager = taskManager;
+        }
+
+        public BuildableConcurrentIndexedListNode(TKey key, ITaskManager taskManager) : base(key, default, taskManager.GetActionChainer())
+        {
+            this.taskManager = taskManager;
+        }
+
+        public BuildableConcurrentIndexedListNode(TKey key, TValue value) : this(key, value, Chaining.taskManager)
+        {
+        }
+
+        public BuildableConcurrentIndexedListNode(TKey key) : this(key, Chaining.taskManager)
+        {
+        }
+
+        public void Build(TValue res)
+        {
+            this.Value = res;
+            building = FALSE;
+        }
+
+
+    }
+
+
+    public class BuildableConcurrentIndexedListNode2<TKey, TValue> : ConcurrentIndexedListNode2<TKey, TValue>
+    {
+        private const int TRUE = 1;
+        private const int FALSE = 0;
+        private int building = TRUE;
+
+        public override TValue Value
+        {
+            get
+            {
+                taskManager.SpinUntil(() => building == TRUE);
+                return base.Value;
+            }
+        }
+
+        public BuildableConcurrentIndexedListNode2(TKey key, TValue value, ITaskManager taskManager) : base(key, value, taskManager)
+        {
+            building = FALSE;
+        }
+
+        public BuildableConcurrentIndexedListNode2(TKey key, ITaskManager taskManager) : base(key, default, taskManager)
+        {
+        }
+
+        public BuildableConcurrentIndexedListNode2(TKey key, TValue value) : this(key, value, Chaining.taskManager)
+        {
+        }
+
+        public BuildableConcurrentIndexedListNode2(TKey key) : this(key, Chaining.taskManager)
+        {
+        }
+
+        public void Build(TValue res)
+        {
+            this.item.value = res;
+            building = FALSE;
+        }
+
+
     }
 }

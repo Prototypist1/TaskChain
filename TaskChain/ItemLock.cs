@@ -4,11 +4,11 @@ using System.Threading;
 namespace Prototypist.TaskChain
 {
 
-    internal class ItemLock :  IActionChainer
+    internal class ItemLock : IActionChainer
     {
         private const int TRUE = 1;
         private const int FALSE = 0;
-        
+
         private readonly TaskManager taskManager;
         private volatile int running = FALSE;
 
@@ -24,7 +24,7 @@ namespace Prototypist.TaskChain
 
         public T Run<T>(Func<T> func)
         {
-            var res = default(T);
+            T res = default;
             taskManager.SpinUntil(() => TryRun(func, out res));
             return res;
         }
@@ -39,7 +39,7 @@ namespace Prototypist.TaskChain
                 }
                 finally
                 {
-                    Interlocked.Exchange(ref running, FALSE);
+                    running = FALSE;
                 }
                 return true;
             }
@@ -56,11 +56,11 @@ namespace Prototypist.TaskChain
                 }
                 finally
                 {
-                    Interlocked.Exchange(ref running, FALSE);
+                    running= FALSE;
                 }
                 return true;
             }
-            result = default(T);
+            result = default;
             return false;
         }
 

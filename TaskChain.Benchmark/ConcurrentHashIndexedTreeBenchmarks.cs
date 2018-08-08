@@ -69,7 +69,7 @@ namespace Prototypist.TaskChain.Benchmark
 
         private Dictionary<int, int> dict;
 
-        private RawConcurrentHashIndexed<int, Concurrent<int>> rawConcurrentHashIndexed;
+        private RawConcurrentHashIndexed<int, int> rawConcurrentHashIndexed;
 
         private ConcurrentHashIndexedTree<int, int> concurrentHashIndexedTree;
         private ConcurrentHashIndexedTree<HashTest, int> concurrentHashIndexedTree2;
@@ -100,8 +100,8 @@ namespace Prototypist.TaskChain.Benchmark
                 concurrentDictionary2.GetOrAdd(new HashTest(1, i), i);
             }
 
-            rawConcurrentHashIndexed = new RawConcurrentHashIndexed<int, Concurrent<int>>();
-            rawConcurrentHashIndexed.GetOrAdd(new IndexedListNode<int, Concurrent<int>>(1, new Concurrent<int>(1)));
+            rawConcurrentHashIndexed = new RawConcurrentHashIndexed<int, int>();
+            rawConcurrentHashIndexed.GetOrAdd(new ConcurrentIndexedListNode2<int, int>(1, 1));
 
             dict = new Dictionary<int, int>();
             dict[1] = 1;

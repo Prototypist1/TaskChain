@@ -9,7 +9,7 @@ namespace Prototypist.TaskChain.DataTypes
 
     public class ConcurrentSet<T> : IEnumerable<T>
     {
-        private readonly RawConcurrentHashIndexedTree<T, BuildableConcurrent<T>> backing = new RawConcurrentHashIndexedTree<T, BuildableConcurrent<T>>();
+        private readonly RawConcurrentHashIndexedTree<T, T> backing = new RawConcurrentHashIndexedTree<T, T>();
         private const long enumerationAdd = 1_000_000_000;
         private long enumerationCount = 0;
 
@@ -35,7 +35,7 @@ namespace Prototypist.TaskChain.DataTypes
             {
                 NoModificationDuringEnumeration();
 
-                return backing.GetOrAdd(new IndexedListNode<T, BuildableConcurrent<T>>(value, new BuildableConcurrent<T>(value))).value.Value;
+                return backing.GetOrAdd(new ConcurrentIndexedListNode<T, T>(value, value)).Value;
             }
             finally
             {
@@ -49,7 +49,7 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new IndexedListNode<T, BuildableConcurrent<T>>(value, new BuildableConcurrent<T>(value));
+                var toAdd = new ConcurrentIndexedListNode<T, T>(value,value);
                 var res = backing.GetOrAdd(toAdd);
                 if (!object.ReferenceEquals(res, toAdd))
                 {
@@ -67,7 +67,7 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new IndexedListNode<T, BuildableConcurrent<T>>(value, new BuildableConcurrent<T>(value));
+                var toAdd = new ConcurrentIndexedListNode<T, T>(value, value);
                 var res = backing.GetOrAdd(toAdd);
                 return ReferenceEquals(res, toAdd);
             }
@@ -86,7 +86,7 @@ namespace Prototypist.TaskChain.DataTypes
             }
             foreach (var item in backing)
             {
-                yield return item.value.Value;
+                yield return item.Value;
             }
             Interlocked.Add(ref enumerationCount, -enumerationAdd);
         }

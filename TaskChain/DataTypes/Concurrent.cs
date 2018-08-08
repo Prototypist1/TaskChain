@@ -10,77 +10,111 @@ namespace Prototypist.TaskChain.DataTypes
 {
     public class Concurrent<TValue>
     {
-
-        public struct ValueHolder:IDisposable
-        {
-            private readonly Concurrent<TValue> owner;
-
-            public ValueHolder(Concurrent<TValue> owner)
-            {
-                this.owner = owner;
-            }
-
-            public TValue Value
-            {
-                get => owner.Value;
-                set => owner.Value = value;
-            }
-
-            public void Dispose() { }
-        }
-
-        public virtual TValue Value
-        {
-            get
-            {
-                return value;
-            }
-            protected set
-            {
-                this.value = value;
-            }
-        }
+        public TValue Value { get; protected set; }
 
         protected readonly IActionChainer actionChainer;
-        protected TValue value;
 
         public Concurrent(TValue value, IActionChainer actionChainer)
         {
-            this.value = value;
+            //this.wrapper = new ValueHolder(this);
+            this.Value = value;
             this.actionChainer = actionChainer;
         }
 
-        public Concurrent(TValue value):this(value,Chaining.taskManager.GetActionChainer())
+        public Concurrent(TValue value) : this(value, Chaining.taskManager.GetActionChainer())
         {
         }
 
-        public void Do(Action<ValueHolder> action)
+        public virtual void Do(Func<TValue,TValue> action)
         {
-            actionChainer.Run(() => {
-                using (var wrapper = new ValueHolder(this)) {
-                    action(wrapper);
-                }
+            actionChainer.Run(() =>
+            {
+                Value = action(Value);
             });
         }
 
-        public TRes Do<TRes>(Func<ValueHolder,TRes> action)
+        public virtual TRes Do<TRes>(Func<TValue,(TValue, TRes)> action)
         {
-            return actionChainer.Run(() => {
-                using (var wrapper = new ValueHolder(this))
+            return actionChainer.Run(() =>
+            {
+                var x = action(Value);
+                Value = x.Item1;
+                return x.Item2;
+            });
+        }
+    }
+
+    public class Inner<TValue>
+    {
+        public TValue value;
+    }
+
+    public class Concurrent2<TValue>
+    {
+
+        private Inner<TValue> item;
+        private Inner<TValue> oldItem;
+        private readonly TaskManager taskManager;
+
+        public TValue Value
+        {
+            get
+            {
+                return oldItem.value;
+            }
+        }
+
+        public void Set(TValue value) {
+            var myItem = new Inner<TValue> { value = value };
+            var localOldItem = oldItem;
+            if (Interlocked.CompareExchange(ref item, myItem, localOldItem) == localOldItem) {
+                oldItem = myItem;
+            }
+            else {
+                taskManager.SpinUntil(() =>
                 {
-                    return action(wrapper);
-                }
-            });
+                    localOldItem = oldItem;
+                    if (Interlocked.CompareExchange(ref item, myItem, localOldItem) == localOldItem)
+                    {
+                        oldItem = myItem;
+                        return true;
+                    }
+                    return false;
+                });
+            }
+        }
+
+        public virtual void Do(Func<TValue, TValue> action)
+        {
+            var myItem = new Inner<TValue>();
+            var localOldItem = oldItem;
+            if (Interlocked.CompareExchange(ref item, myItem, localOldItem) == localOldItem)
+            {
+                oldItem.value = action(oldItem.value);
+                item = oldItem;
+            }
+            else
+            {
+                taskManager.SpinUntil(() =>
+                {
+                    localOldItem = oldItem;
+                    if (Interlocked.CompareExchange(ref item, myItem, localOldItem) == localOldItem)
+                    {
+                        oldItem.value = action(oldItem.value);
+                        item = oldItem;
+                        return true;
+                    }
+                    return false;
+                });
+            }
         }
 
     }
-    
-    
 
     //public class ConcurrentListNode<TValue> : Concurrent<TValue>
     //{
     //    public ConcurrentListNode<TValue> next;
-        
+
     //    public ConcurrentListNode( TValue value) : base(value)
     //    {
     //    }

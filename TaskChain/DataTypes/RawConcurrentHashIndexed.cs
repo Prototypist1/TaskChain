@@ -4,10 +4,10 @@ using System.Threading;
 
 namespace Prototypist.TaskChain.DataTypes
 {
-    public class RawConcurrentHashIndexed<TKey, TValue> : IEnumerable<IndexedListNode<TKey, TValue>>
+    public class RawConcurrentHashIndexed<TKey, TValue> : IEnumerable<ConcurrentIndexedListNode2<TKey, TValue>>
     {
         private const int Size = 64;
-        private readonly TreeNode<IndexedListNode<TKey, TValue>> tree = new TreeNode<IndexedListNode<TKey, TValue>>(Size);
+        private readonly TreeNode<ConcurrentIndexedListNode2<TKey, TValue>> tree = new TreeNode<ConcurrentIndexedListNode2<TKey, TValue>>(Size);
 
         public bool Contains(TKey key)
         {
@@ -24,7 +24,7 @@ namespace Prototypist.TaskChain.DataTypes
             }
             return false;
         }
-        public IndexedListNode<TKey, TValue> GetNodeOrThrow(TKey key)
+        public ConcurrentIndexedListNode2<TKey, TValue> GetNodeOrThrow(TKey key)
         {
             var hash = key.GetHashCode();
             var a = ((uint)hash) % Size;
@@ -37,14 +37,17 @@ namespace Prototypist.TaskChain.DataTypes
             at = at.next;
             goto x;
         }
-        public IndexedListNode<TKey, TValue> GetOrAdd(IndexedListNode<TKey, TValue> node)
+        public ConcurrentIndexedListNode2<TKey, TValue> GetOrAdd(ConcurrentIndexedListNode2<TKey, TValue> node)
         {
             var hash = node.key.GetHashCode();
             var a = ((uint)hash) % Size;
-            var at = Interlocked.CompareExchange(ref tree.backing[a], node, null);
+            var at = tree.backing[a]; 
             if (at == null)
             {
-                return node;
+                at = Interlocked.CompareExchange(ref tree.backing[a], node, null);
+                if (at == null) {
+                    return node;
+                }
             }
             while (true)
             {
@@ -52,18 +55,22 @@ namespace Prototypist.TaskChain.DataTypes
                 {
                     return at;
                 }
-                if (Interlocked.CompareExchange(ref at.next, node, null) == null)
+                if (at.next == null)
                 {
-                    return node;
+                    if (Interlocked.CompareExchange(ref at.next, node, null) == null)
+                    {
+                        return node;
+                    }
                 }
                 at = at.next;
             };
         }
-        public bool TryGet(TKey key, out TValue res)
+
+        public bool TryGet(TKey key, out ConcurrentIndexedListNode2<TKey, TValue> res)
         {
             try
             {
-                res = GetNodeOrThrow(key).value;
+                res = GetNodeOrThrow(key);
                 return true;
             }
             catch
@@ -73,7 +80,7 @@ namespace Prototypist.TaskChain.DataTypes
             }
         }
 
-        public IEnumerator<IndexedListNode<TKey, TValue>> GetEnumerator()
+        public IEnumerator<ConcurrentIndexedListNode2<TKey, TValue>> GetEnumerator()
         {
             foreach (var l1 in tree.backing)
             {

@@ -75,8 +75,9 @@ namespace Prototypist.TaskChain.DataTypes
                         {
                             replace[i] = backing.Value[i];
                         }
-                        x.Value = replace;
+                        return replace;
                     }
+                    return x;
                 });
             }
             Interlocked.CompareExchange(ref backing.Value[myOuterIndex], new TValue[innerSize], null);
@@ -159,7 +160,7 @@ namespace Prototypist.TaskChain.DataTypes
                 NoModificationDuringEnumeration();
                 if (backing.TryGet(i, out var res))
                 {
-                    res.Do(x => x.Value = value);
+                    res.Do(x => value);
                     return true;
                 }
                 value = default;
@@ -170,7 +171,7 @@ namespace Prototypist.TaskChain.DataTypes
                 Interlocked.Decrement(ref enumerationCount);
             }
         }
-        public bool TryDo(int i, Action<Concurrent<TValue>.ValueHolder> action)
+        public bool TryDo(int i, Func<TValue,TValue> action)
         {
             try
             {
@@ -187,7 +188,7 @@ namespace Prototypist.TaskChain.DataTypes
                 Interlocked.Decrement(ref enumerationCount);
             }
         }
-        public bool TryDo<TOut>(int i, Func<Concurrent<TValue>.ValueHolder, TOut> func, out TOut result)
+        public bool TryDo<TOut>(int i, Func<TValue, (TValue, TOut)> func, out TOut result)
         {
             try
             {
@@ -260,7 +261,7 @@ namespace Prototypist.TaskChain.DataTypes
     {
         public static void Update<TValue>(this ConcurrentArrayArray<TValue> self, int index, Func<TValue, TValue> func)
         {
-            if (self.TryDo(index, x => x.Value = func(x.Value)))
+            if (self.TryDo(index, x => func(x)))
             {
                 return;
             }
