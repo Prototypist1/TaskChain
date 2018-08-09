@@ -90,22 +90,17 @@ namespace Prototypist.TaskChain
         
         public void Set(TValue value)
         {
-            //lock (item)
-            //{
-            //    item.value = value;
-            //}
-
-            //var myItem = new Inner<TValue> { value = value };
-            //taskManager.SpinUntil(() =>
-            //{
-            //    var localOldItem = oldItem;
-            //    if (Interlocked.CompareExchange(ref item, myItem, localOldItem) == localOldItem)
-            //    {
-            //        oldItem = myItem;
-            //        return true;
-            //    }
-            //    return false;
-            //});
+            var myItem = new Inner<TValue> { value = value };
+            taskManager.SpinUntil(() =>
+            {
+                var localOldItem = oldItem;
+                if (Interlocked.CompareExchange(ref item, myItem, localOldItem) == localOldItem)
+                {
+                    oldItem = myItem;
+                    return true;
+                }
+                return false;
+            });
 
         }
 
@@ -148,6 +143,57 @@ namespace Prototypist.TaskChain
         }
     }
 
+
+    public class ConcurrentIndexedListNode3<TKey, TValue>
+    {
+        private readonly object mutex;
+        public readonly TKey key;
+        protected TValue value;
+        public readonly int hash;
+        public ConcurrentIndexedListNode3<TKey, TValue> next;
+
+        public virtual TValue Value
+        {
+            get
+            {
+                return value;
+            }
+        }
+
+        public ConcurrentIndexedListNode3(TKey key, TValue value)
+        {
+            this.mutex = new object();
+            this.key = key;
+            this.hash = key.GetHashCode();
+            this.value = value;
+        }
+        
+
+        public void Set(TValue value)
+        {
+            lock (mutex) {
+                this.value = value;
+            }
+        }
+
+        public void Do(Func<TValue, TValue> action)
+        {
+            lock (mutex)
+            {
+                value = action(value);
+            }
+        }
+
+        public TRes Do<TRes>(Func<TValue, (TValue, TRes)> action)
+        {
+            lock (mutex)
+            {
+                var x = action(value);
+                value = x.Item1;
+                return x.Item2;
+            }
+        }
+    }
 
     public class BuildableConcurrentIndexedListNode<TKey, TValue> : ConcurrentIndexedListNode<TKey, TValue>
     {
@@ -227,6 +273,30 @@ namespace Prototypist.TaskChain
             this.item.value = res;
             building = FALSE;
             this.oldItem = oldItemCache;
+        }
+    }
+
+    public class BuildableConcurrentIndexedListNode3<TKey, TValue> : ConcurrentIndexedListNode3<TKey, TValue>
+    {
+        private ManualResetEventSlim manualReset = new ManualResetEventSlim();
+
+        public override TValue Value
+        {
+            get
+            {
+                manualReset.Wait();
+                return base.Value;
+            }
+        }
+        
+        public BuildableConcurrentIndexedListNode3(TKey key) : base(key, default)
+        {
+        }
+        
+        public void Build(TValue res)
+        {
+            value = res;
+            manualReset.Set();
         }
     }
 }

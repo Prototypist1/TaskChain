@@ -99,7 +99,7 @@ namespace Prototypist.TaskChain.Benchmark
             }
 
             rawConcurrentHashIndexed = new RawConcurrentHashIndexed<int, int>();
-            rawConcurrentHashIndexed.GetOrAdd(new ConcurrentIndexedListNode2<int, int>(1, 1));
+            rawConcurrentHashIndexed.GetOrAdd(new ConcurrentIndexedListNode3<int, int>(1, 1));
 
             dict = new Dictionary<int, int>
             {

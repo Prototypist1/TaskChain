@@ -86,11 +86,10 @@ namespace Prototypist.TaskChain.Benchmark
         private Random random;
         private List<Action> cdActions;
         private List<Action> myActions;
-
-        //[Params(1, 50, 100, 300, 500)]
-        [Params(1)]
+        
+        [Params(1,10)]
         public int RandomRange;
-        [Params(4)]
+        [Params(1,4)]
         public int Threads;
         [Params(10000)]
         public  int Reps;
@@ -138,7 +137,7 @@ namespace Prototypist.TaskChain.Benchmark
             Parallel.Invoke(myActions.ToArray());
         }
 
-        //[Benchmark]
+        [Benchmark]
         public void ConcurrentDictionary()
         {
             Parallel.Invoke(cdActions.ToArray());

@@ -96,12 +96,8 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new ConcurrentIndexedListNode2<TKey, TValue>(key, value);
-                var item = backing.GetOrAdd(toAdd);
-                if (item != toAdd)
-                {
-                    item.Set(value);
-                }
+                var toAdd = new ConcurrentIndexedListNode3<TKey, TValue>(key, value);
+                backing.SetOrAdd(toAdd);
             }
             finally
             {
@@ -112,7 +108,7 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new ConcurrentIndexedListNode2<TKey, TValue>(key, fallback);
+                var toAdd = new ConcurrentIndexedListNode3<TKey, TValue>(key, fallback);
                 return backing.GetOrAdd(toAdd).Value;
             }
             finally
@@ -124,7 +120,7 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new BuildableConcurrentIndexedListNode2<TKey, TValue>(key);
+                var toAdd = new BuildableConcurrentIndexedListNode3<TKey, TValue>(key);
                 var current = backing.GetOrAdd(toAdd);
                 if (ReferenceEquals(current, toAdd)) {
                     toAdd.Build(fallback());
@@ -141,7 +137,7 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new BuildableConcurrentIndexedListNode2<TKey, TValue>(key);
+                var toAdd = new BuildableConcurrentIndexedListNode3<TKey, TValue>(key);
                 var current = backing.GetOrAdd(toAdd);
                 if (ReferenceEquals(current, toAdd))
                 {
@@ -161,7 +157,7 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new ConcurrentIndexedListNode2<TKey, TValue>(key, fallback);
+                var toAdd = new ConcurrentIndexedListNode3<TKey, TValue>(key, fallback);
                 var current = backing.GetOrAdd(toAdd);
                 if (!ReferenceEquals(current, toAdd))
                 {
@@ -177,7 +173,7 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new ConcurrentIndexedListNode2<TKey, TValue>(key, fallback);
+                var toAdd = new ConcurrentIndexedListNode3<TKey, TValue>(key, fallback);
                 var current = backing.GetOrAdd(toAdd);
                 if (!ReferenceEquals(current, toAdd))
                 {
@@ -193,7 +189,7 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new BuildableConcurrentIndexedListNode2<TKey, TValue>(key);
+                var toAdd = new BuildableConcurrentIndexedListNode3<TKey, TValue>(key);
                 var current = backing.GetOrAdd(toAdd);
                 if (ReferenceEquals(current, toAdd))
                 {
@@ -214,7 +210,7 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new ConcurrentIndexedListNode2<TKey, TValue>(key, fallback);
+                var toAdd = new ConcurrentIndexedListNode3<TKey, TValue>(key, fallback);
                 var current = backing.GetOrAdd(toAdd);
                 if (!ReferenceEquals(current, toAdd))
                 {
@@ -234,7 +230,7 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new BuildableConcurrentIndexedListNode2<TKey, TValue>(key);
+                var toAdd = new BuildableConcurrentIndexedListNode3<TKey, TValue>(key);
                 var current = backing.GetOrAdd(toAdd);
                 if (ReferenceEquals(current, toAdd))
                 {
@@ -258,7 +254,7 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new ConcurrentIndexedListNode2<TKey, TValue>(key, fallback);
+                var toAdd = new ConcurrentIndexedListNode3<TKey, TValue>(key, fallback);
                 var current = backing.GetOrAdd(toAdd);
                 return toAdd.Do(function);
             }
@@ -272,7 +268,7 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new BuildableConcurrentIndexedListNode2<TKey, TValue>(key);
+                var toAdd = new BuildableConcurrentIndexedListNode3<TKey, TValue>(key);
                 var res = backing.GetOrAdd(toAdd);
                 if (ReferenceEquals(res,toAdd))
                 {
