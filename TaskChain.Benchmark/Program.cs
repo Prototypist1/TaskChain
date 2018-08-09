@@ -9,7 +9,8 @@ namespace Prototypist.TaskChain.Benchmark
         {
             //var summary = BenchmarkRunner.Run<ReadAllItems>();
             //var summary = BenchmarkRunner.Run<WriteAllItems>();
-            var summary = BenchmarkRunner.Run<ParallelUpdate>();
+            //var summary = BenchmarkRunner.Run<ParallelUpdate>();
+            var summary = BenchmarkRunner.Run<InterlockedTest>();
             Console.WriteLine(summary);
             Console.ReadLine();
         }

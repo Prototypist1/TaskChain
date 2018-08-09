@@ -3,6 +3,7 @@ using Prototypist.TaskChain.DataTypes;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Prototypist.TaskChain.Benchmark
@@ -75,6 +76,64 @@ namespace Prototypist.TaskChain.Benchmark
             }
 
             Parallel.Invoke(actions.ToArray());
+        }
+    }
+
+    public class InterlockedTest {
+
+        [Params(4)]
+        public int Threads;
+        [Params(10000)]
+        public int Reps;
+
+        private object o = new object();
+        private object o2 = new object();
+        private int i1 = 0;
+        private List<Action> lockActions;
+        private int i2;
+        private List<Action> interlockActions;
+
+        [GlobalSetup]
+        public void Setup()
+        {
+            void lockAdd()
+            {
+                lock (o) {
+                    i1++;
+                }
+            }
+
+            lockActions = new List<Action>();
+            for (int i = 0; i < Threads; i++)
+            {
+                lockActions.Add(lockAdd);
+            }
+
+            void interlockAdd()
+            {
+                //Interlocked.CompareExchange(ref o2, o2, o2);
+                Interlocked.Increment(ref i2);
+            }
+
+            interlockActions = new List<Action>();
+            for (int i = 0; i < Threads; i++)
+            {
+                interlockActions.Add(interlockAdd);
+            }
+
+        }
+
+
+        [Benchmark]
+        public void Lock()
+        {
+            Parallel.Invoke(lockActions.ToArray());
+        }
+
+        [Benchmark]
+        public void InterLocked()
+        {
+            Parallel.Invoke(interlockActions.ToArray());
         }
     }
 
