@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace Prototypist.TaskChain
 {
-    public class ActionAbleConcurrent<TValue>
+    public class QueueingConcurrent<TValue>
     {
         private volatile object value;
 
@@ -31,7 +31,9 @@ namespace Prototypist.TaskChain
         private const int STOPPED = 0;
         private int running = STOPPED;
         private volatile Link startOfChain;
-        
+
+        public QueueingConcurrent(TValue value) => this.value = value;
+
         public TValue GetValue()
         {
             return (TValue)value;

@@ -4,6 +4,8 @@
     {
         private volatile object value;
 
+        public Concurrent(TValue value) => this.value = value;
+
         public TValue GetValue() {
             return (TValue)value;
         }

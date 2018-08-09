@@ -1,13 +1,30 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Text;
 using System.Threading;
 
-namespace Prototypist.TaskChain.DataTypes
+namespace Prototypist.TaskChain
 {
-    public class RawConcurrentHashIndexed<TKey, TValue> : IEnumerable<ConcurrentIndexedListNode3<TKey, TValue>>
+    public class ConcurrentIndexed<TKey, TValue> : IEnumerable<KeyValuePair<TKey, TValue>>
     {
+        public class KeyValue
+        {
+            public KeyValue next;
+            public readonly TKey key;
+            public readonly int hash;
+            public readonly TValue value;
+
+            public KeyValue(TKey key, TValue value)
+            {
+                this.key = key;
+                this.value = value;
+                this.hash = key.GetHashCode();
+            }
+        }
+
         private const int Size = 128;
-        private readonly ConcurrentIndexedListNode3<TKey, TValue>[] tree = new ConcurrentIndexedListNode3<TKey, TValue>[Size];
+        private readonly KeyValue[] tree = new KeyValue[Size];
 
         public bool Contains(TKey key)
         {
@@ -25,7 +42,7 @@ namespace Prototypist.TaskChain.DataTypes
             return false;
         }
 
-        public ConcurrentIndexedListNode3<TKey, TValue> GetNodeOrThrow(TKey key)
+        public KeyValue GetNodeOrThrow(TKey key)
         {
             var hash = key.GetHashCode();
             var a = ((uint)hash) % Size;
@@ -39,13 +56,14 @@ namespace Prototypist.TaskChain.DataTypes
                 at = at.next;
             }
         }
-        
-        public ConcurrentIndexedListNode3<TKey, TValue> GetOrAdd(ConcurrentIndexedListNode3<TKey, TValue> node)
+
+        public KeyValue GetOrAdd(KeyValue node)
         {
             var hash = node.hash;
             var a = ((uint)hash) % Size;
-            var at = tree[a]; 
-            if (at == null && Interlocked.CompareExchange(ref tree[a], node, null) == null) {
+            var at = tree[a];
+            if (at == null && Interlocked.CompareExchange(ref tree[a], node, null) == null)
+            {
                 return node;
             }
             while (true)
@@ -62,31 +80,7 @@ namespace Prototypist.TaskChain.DataTypes
             };
         }
 
-        public void SetOrAdd(ConcurrentIndexedListNode3<TKey, TValue> node)
-        {
-            var hash = node.hash;
-            var a = ((uint)hash) % Size;
-            var at = tree[a];
-            if (at == null && Interlocked.CompareExchange(ref tree[a], node, null) == null)
-            {
-                return;
-            }
-            while (true)
-            {
-                if (hash == at.hash && node.key.Equals(at.key))
-                {
-                    at.Set(node.Value);
-                    return;
-                }
-                if (at.next == null && Interlocked.CompareExchange(ref at.next, node, null) == null)
-                {
-                    return;
-                }
-                at = at.next;
-            };
-        }
-
-        public bool TryGet(TKey key, out ConcurrentIndexedListNode3<TKey, TValue> res)
+        public bool TryGet(TKey key, out KeyValue res)
         {
             try
             {
@@ -100,7 +94,7 @@ namespace Prototypist.TaskChain.DataTypes
             }
         }
 
-        public IEnumerator<ConcurrentIndexedListNode3<TKey, TValue>> GetEnumerator()
+        public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
         {
             foreach (var l1 in tree)
             {
@@ -109,13 +103,14 @@ namespace Prototypist.TaskChain.DataTypes
                     var at = l1;
                     while (at != null)
                     {
-                        yield return at;
+                        yield return new KeyValuePair<TKey, TValue>(at.key, at.value);
                         at = at.next;
                     }
                 }
             }
         }
+
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
-
 }
+
