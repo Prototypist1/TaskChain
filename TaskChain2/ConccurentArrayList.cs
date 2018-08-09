@@ -95,7 +95,7 @@ namespace Prototypist.TaskChain
             }
             catch
             {
-                value = default;
+                value = default(TValue);
                 return false;
             }
         }
