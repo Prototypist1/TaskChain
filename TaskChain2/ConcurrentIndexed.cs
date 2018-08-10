@@ -1,116 +1,278 @@
-﻿using System;
+﻿using Prototypist.TaskChain;
+using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Text;
+using System.Linq;
 using System.Threading;
 
-namespace Prototypist.TaskChain
+namespace Prototypist.TaskChain.DataTypes
 {
-    public class ConcurrentIndexed<TKey, TValue> : IEnumerable<KeyValuePair<TKey, TValue>>
+
+    public class ConcurrentIndexed<TKey, TValue> :  IEnumerable<KeyValuePair<TKey, TValue>>
     {
-        public class KeyValue
-        {
-            public KeyValue next;
-            public readonly TKey key;
-            public readonly int hash;
-            public readonly TValue value;
+        private readonly RawConcurrentIndexed<TKey, QueueingConcurrent<TValue>> backing = new RawConcurrentIndexed<TKey, QueueingConcurrent<TValue>>();
+        private const long enumerationAdd = 1_000_000_000;
+        private long enumerationCount = 0;
 
-            public KeyValue(TKey key, TValue value)
+        private void NoModificationDuringEnumeration()
+        {
+            var res = Interlocked.Increment(ref enumerationCount);
+            if (res >= enumerationAdd)
             {
-                this.key = key;
-                this.value = value;
-                this.hash = key.GetHashCode();
+                throw new Exception("No modification during enumeration");
             }
         }
 
-        private const int Size = 128;
-        private readonly KeyValue[] tree = new KeyValue[Size];
-
-        public bool Contains(TKey key)
-        {
-            var hash = key.GetHashCode();
-            var a = ((uint)hash) % Size;
-            var ata = tree[a];
-            while (ata != null)
-            {
-                if (hash == ata.hash && key.Equals(ata.key))
-                {
-                    return true;
-                }
-                ata = ata.next;
-            }
-            return false;
+        public bool ContainsKey(TKey key) {
+            return backing.Contains(key);
         }
 
-        public KeyValue GetNodeOrThrow(TKey key)
-        {
-            var hash = key.GetHashCode();
-            var a = ((uint)hash) % Size;
-            var at = tree[a];
-            while (true)
-            {
-                if (hash == at.hash && key.Equals(at.key))
-                {
-                    return at;
-                }
-                at = at.next;
-            }
-        }
-
-        public KeyValue GetOrAdd(KeyValue node)
-        {
-            var hash = node.hash;
-            var a = ((uint)hash) % Size;
-            var at = tree[a];
-            if (at == null && Interlocked.CompareExchange(ref tree[a], node, null) == null)
-            {
-                return node;
-            }
-            while (true)
-            {
-                if (hash == at.hash && node.key.Equals(at.key))
-                {
-                    return at;
-                }
-                if (at.next == null && Interlocked.CompareExchange(ref at.next, node, null) == null)
-                {
-                    return node;
-                }
-                at = at.next;
-            };
-        }
-
-        public bool TryGet(TKey key, out KeyValue res)
+        public bool TryGet(TKey key, out TValue res)
         {
             try
             {
-                res = GetNodeOrThrow(key);
+                res = backing.GetNodeOrThrow(key).value.GetValue();
                 return true;
             }
-            catch
-            {
-                res = default(KeyValue);
+            catch {
+                res = default;
                 return false;
             }
         }
 
-        public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
+        public bool TryUpdate(TKey key, TValue newValue)
         {
-            foreach (var l1 in tree)
+            try
             {
-                if (l1 != null)
+                NoModificationDuringEnumeration();
+                if (backing.TryGet(key, out var item))
                 {
-                    var at = l1;
-                    while (at != null)
-                    {
-                        yield return new KeyValuePair<TKey, TValue>(at.key, at.value);
-                        at = at.next;
-                    }
+                    item.value.SetValue(newValue);
+                    return true;
                 }
+                return false;
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
+        public bool TryDo(TKey key, Func<TValue, TValue> action)
+        {
+            try
+            {
+                NoModificationDuringEnumeration();
+                if (backing.TryGet(key, out var item))
+                {
+                    item.value.Act(action);
+                    return true;
+                }
+                return false;
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
+        public void Set(TKey key, TValue value) {
+            try
+            {
+                NoModificationDuringEnumeration();
+                var toAdd = new RawConcurrentIndexed<TKey, QueueingConcurrent<TValue>>.KeyValue(key, new QueueingConcurrent<TValue>(value));
+                var res = backing.GetOrAdd(toAdd);
+                if (!ReferenceEquals(toAdd, res)) {
+                    res.value.SetValue(value);
+                }
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
+        public TValue GetOrAdd(TKey key, TValue fallback) {
+            try
+            {
+                NoModificationDuringEnumeration();
+                var toAdd = new RawConcurrentIndexed<TKey, QueueingConcurrent<TValue>>.KeyValue(key, new QueueingConcurrent<TValue>(fallback));
+                return backing.GetOrAdd(toAdd).value.GetValue();
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
+        public TValue GetOrAdd(TKey key, Func<TValue> fallback) {
+            try
+            {
+                NoModificationDuringEnumeration();
+                var buildable = new BuildableQueueingConcurrent<TValue>();
+                var toAdd = new RawConcurrentIndexed<TKey, QueueingConcurrent<TValue>>.KeyValue(key, buildable);
+                var current = backing.GetOrAdd(toAdd);
+                if (ReferenceEquals(current, toAdd)) {
+                    buildable.Build(fallback());
+                }
+                return current.value.GetValue();
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
+        public void AddOrThrow(TKey key, Func<TValue> fallback)
+        {
+            try
+            {
+                NoModificationDuringEnumeration();
+                var buildable = new BuildableQueueingConcurrent<TValue>();
+                var toAdd = new RawConcurrentIndexed<TKey, QueueingConcurrent<TValue>>.KeyValue(key, buildable);
+                var current = backing.GetOrAdd(toAdd);
+                if (ReferenceEquals(current, toAdd))
+                {
+                    buildable.Build(fallback());
+                }
+                else {
+                    throw new Exception("Item already exits");
+                }
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
+        public void AddOrThrow(TKey key, TValue fallback)
+        {
+            try
+            {
+                NoModificationDuringEnumeration();
+                var toAdd = new RawConcurrentIndexed<TKey, QueueingConcurrent<TValue>>.KeyValue(key, new QueueingConcurrent<TValue>(fallback));
+                var current = backing.GetOrAdd(toAdd);
+                if (!ReferenceEquals(current, toAdd))
+                {
+                    throw new Exception("Item already exits");
+                }
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
+        public void DoOrAdd(TKey key, Func<TValue, TValue> action, TValue fallback) {
+            try
+            {
+                NoModificationDuringEnumeration();
+                var toAdd = new RawConcurrentIndexed<TKey, QueueingConcurrent<TValue>>.KeyValue(key, new QueueingConcurrent<TValue>(fallback));
+                var current = backing.GetOrAdd(toAdd);
+                if (!ReferenceEquals(current, toAdd))
+                {
+                    current.value.Act(action);
+                }
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
+        public void DoOrAdd(TKey key, Func<TValue, TValue> action, Func<TValue> fallback) {
+            try
+            {
+                NoModificationDuringEnumeration();
+                var buildable = new BuildableQueueingConcurrent<TValue>();
+                var toAdd = new RawConcurrentIndexed<TKey, QueueingConcurrent<TValue>>.KeyValue(key, buildable);
+                var current = backing.GetOrAdd(toAdd);
+                if (ReferenceEquals(current, toAdd))
+                {
+                    buildable.Build(fallback());
+                }
+                else
+                {
+                    current.value.Act(action);
+                }
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
             }
         }
 
+    
+        public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() {
+            Interlocked.Add(ref enumerationCount, enumerationAdd);
+            while (Volatile.Read(ref enumerationCount) % enumerationAdd != 0)
+            {
+                // TODO do tasks?
+            }
+            foreach (var item in backing)
+            {
+                yield return new KeyValuePair<TKey, TValue>(item.Key, item.Value.GetValue());
+            }
+            Interlocked.Add(ref enumerationCount, -enumerationAdd);
+        }
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+    }
+
+    public static class ConcurrentHashIndexedTreeExtensions {
+        public static void UpdateOrThrow<TKey, TValue>(this ConcurrentIndexed<TKey, TValue> self, TKey key, TValue newValue)
+        {
+            if (self.TryUpdate(key, newValue))
+            {
+                return;
+            }
+            throw new Exception("No item found for that key");
+        }
+        public static TValue GetOrThrow<TKey, TValue>(this ConcurrentIndexed<TKey, TValue> self, TKey key) {
+            if (self.TryGet(key, out var res)) {
+                return res;
+            }
+            throw new Exception("No item found for that key");
+        }
+        public static void DoOrThrow<TKey, TValue>(this ConcurrentIndexed<TKey, TValue> self, TKey key, Func<TValue, TValue> action) {
+            if (self.TryDo(key, action)) {
+                return;
+            }
+            throw new Exception("No item found for that key");
+        }
+        public static bool TryAdd<TKey, TValue>(this ConcurrentIndexed<TKey, TValue> self, TKey key, TValue value) {
+            try
+            {
+                self.AddOrThrow(key, value);
+                return true;
+            }
+            catch {
+                return false;
+            }
+        }
+        public static TValue UpdateOrAdd<TKey, TValue>(this ConcurrentIndexed<TKey, TValue> self, TKey key, Func<TValue, TValue> function, TValue fallback) {
+            var res = fallback;
+            self.DoOrAdd(key, x => {
+                res = function(x);
+                return res;
+                } , fallback);
+            return res;
+        }
+        public static TValue UpdateOrAdd<TKey, TValue>(this ConcurrentIndexed<TKey, TValue> self, TKey key, Func<TValue, TValue> function, Func<TValue> fallback) {
+            var res = default(TValue);
+            self.DoOrAdd(key, x =>
+            {
+                res = function(x);
+                return res;
+            },()=> {
+                res = fallback();
+                return res;
+                });
+            return res;
+        }
+        public static TValue UpdateOrThrow<TKey, TValue>(this ConcurrentIndexed<TKey, TValue> self, TKey key, Func<TValue, TValue> function) {
+            var res = default(TValue);
+            if (self.TryDo(key, x =>
+            {
+                res = function(x);
+                return res;
+            })){
+                return res;
+            }
+            throw new Exception("No item found for that key");
+        }
     }
 }
-

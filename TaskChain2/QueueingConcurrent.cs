@@ -9,7 +9,7 @@ namespace Prototypist.TaskChain
     {
         private volatile object value;
 
-        private class Link
+        protected class Link
         {
             public readonly Func<TValue, TValue> func;
             public volatile Link next;
@@ -24,18 +24,18 @@ namespace Prototypist.TaskChain
             }
 
             public Link(Func<TValue, TValue> func) => this.func = func ?? throw new ArgumentNullException(nameof(func));
-            
+
         }
-        
-        private volatile Link endOfChain = new Link(x => x);
+
+        protected volatile Link endOfChain = new Link(x => x);
         private const int RUNNING = 1;
         private const int STOPPED = 0;
         private int running = STOPPED;
-        private volatile Link startOfChain;
+        protected volatile Link startOfChain;
 
         public QueueingConcurrent(TValue value) => this.value = value;
 
-        public TValue GetValue()
+        public virtual TValue GetValue()
         {
             return (TValue)value;
         }
@@ -52,16 +52,18 @@ namespace Prototypist.TaskChain
             return link.taskCompletionSource.Task;
         }
 
-        public void WaitForIdle() {
-            if (startOfChain != null) {
+        public void WaitForIdle()
+        {
+            if (startOfChain != null)
+            {
                 return;
             }
 
-            var link = new Link(x=>x);
+            var link = new Link(x => x);
             Run(link);
             link.taskCompletionSource.Task.Wait();
         }
-        
+
         private void Run(Link link)
         {
             while (true)
@@ -117,6 +119,32 @@ namespace Prototypist.TaskChain
                     }
                 }
             }
+        }
+    }
+
+    public class BuildableQueueingConcurrent<TValue> : QueueingConcurrent<TValue>
+    {
+        ManualResetEventSlim eventSlim = new ManualResetEventSlim();
+        private volatile object build;
+        public BuildableQueueingConcurrent() : base(default)
+        {
+            startOfChain = new Link(x =>
+            {
+                eventSlim.Wait();
+                return (TValue)build;
+            });
+            endOfChain = startOfChain;
+        }
+
+        public void Build(TValue value) {
+            build = value;
+            eventSlim.Set();
+        }
+
+        public override TValue GetValue()
+        {
+            eventSlim.Wait();
+            return base.GetValue();
         }
     }
 }

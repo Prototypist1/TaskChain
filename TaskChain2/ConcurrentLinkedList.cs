@@ -6,11 +6,11 @@ namespace Prototypist.TaskChain
 {
     public class ConcurrentLinkedList<TValue>: IReadOnlyCollection<TValue>
     {
-        private volatile Link startOfChain;
-        private volatile Link endOfChain = new Link();
+        protected volatile Link startOfChain;
+        protected volatile Link endOfChain = new Link();
         private int count = 0;
 
-        private class Link
+        protected class Link
         {
             public TValue Value {
                 get {
