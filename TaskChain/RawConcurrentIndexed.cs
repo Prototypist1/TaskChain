@@ -32,9 +32,7 @@ namespace Prototypist.TaskChain
                 return count;
             }
         }
-
-
-
+        
         public TValue this[TKey key] => GetNodeOrThrow(key).value;
 
         public bool ContainsKey(TKey key)
