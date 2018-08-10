@@ -4,10 +4,11 @@ using System.Threading;
 
 namespace Prototypist.TaskChain
 {
-    public class ConcurrentLinkedList<TValue>: IEnumerable<TValue>
+    public class ConcurrentLinkedList<TValue>: IReadOnlyCollection<TValue>
     {
         private volatile Link startOfChain;
         private volatile Link endOfChain = new Link();
+        private int count = 0;
 
         private class Link
         {
@@ -29,6 +30,12 @@ namespace Prototypist.TaskChain
             }
         }
 
+        public int Count {
+            get {
+                return count;
+            }
+        }
+
         public void Add(TValue value) {
             var link = new Link(value);
             while (true)
@@ -36,6 +43,7 @@ namespace Prototypist.TaskChain
                 if (Interlocked.CompareExchange(ref endOfChain.next, link, null) == null)
                 {
                     endOfChain = endOfChain.next;
+                    Interlocked.Increment(ref count);
                     Interlocked.CompareExchange(ref startOfChain, link, null);
                     return;
                 }
