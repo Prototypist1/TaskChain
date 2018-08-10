@@ -4,7 +4,7 @@ using System.Threading;
 
 namespace Prototypist.TaskChain
 {
-    public class ConcurrentLinkedList<TValue>: IReadOnlyCollection<TValue>
+    public class RawConcurrentLinkedList<TValue>: IReadOnlyCollection<TValue>
     {
         protected volatile Link startOfChain;
         protected volatile Link endOfChain = new Link();

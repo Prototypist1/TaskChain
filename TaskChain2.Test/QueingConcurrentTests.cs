@@ -17,15 +17,12 @@ namespace Prototypist.TaskChain.Test
             var target = new QueueingConcurrent<int>(0);
 
             int plusOne(int x) => x + 1;
-
-            var array = new Action[1000];
+            
             for (int i = 0; i < 1000; i++)
             {
-                array[i] = () => target.Act(plusOne);
+                target.Act(plusOne);
             }
             
-            Parallel.Invoke(array);
-
             target.WaitForIdle();
             
             Assert.Equal(1000, target.GetValue());

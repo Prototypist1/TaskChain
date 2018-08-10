@@ -198,10 +198,7 @@ namespace Prototypist.TaskChain.DataTypes
     
         public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() {
             Interlocked.Add(ref enumerationCount, enumerationAdd);
-            while (Volatile.Read(ref enumerationCount) % enumerationAdd != 0)
-            {
-                // TODO do tasks?
-            }
+            SpinWait.SpinUntil(() => Volatile.Read(ref enumerationCount) % enumerationAdd == 0);
             foreach (var item in backing)
             {
                 yield return new KeyValuePair<TKey, TValue>(item.Key, item.Value.GetValue());

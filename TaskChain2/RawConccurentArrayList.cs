@@ -6,7 +6,7 @@ using System.Threading;
 
 namespace Prototypist.TaskChain
 {
-    public class ConcurrentArrayList<TValue> : IReadOnlyList<TValue>
+    public class RawConcurrentArrayList<TValue> : IReadOnlyList<TValue>
         where TValue : class
     {
         private readonly QueueingConcurrent<TValue[][]> backing = new QueueingConcurrent<TValue[][]>(new TValue[5][]);
