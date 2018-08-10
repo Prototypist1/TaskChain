@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 
 namespace Prototypist.TaskChain
 {
+
     public class QueueingConcurrent<TValue>
     {
         private volatile object value;
@@ -12,61 +13,20 @@ namespace Prototypist.TaskChain
         {
             public readonly Func<TValue, TValue> func;
             public volatile Link next;
-            public virtual void Done()
+            public TaskCompletionSource<bool> taskCompletionSource = new TaskCompletionSource<bool>();
+            public void Done()
             {
+                taskCompletionSource.SetResult(true);
             }
-            public virtual void Done(Exception e)
+            public void Done(Exception e)
             {
+                taskCompletionSource.SetException(e);
             }
 
             public Link(Func<TValue, TValue> func) => this.func = func ?? throw new ArgumentNullException(nameof(func));
-
-            internal virtual void Wait()
-            {
-            }
+            
         }
-
-        private class WaitingLink : Link
-        {
-            public Exception exception;
-
-            public override void Done()
-            {
-
-                lock (this)
-                {
-                    done = true;
-                    Monitor.Pulse(this);
-                }
-            }
-            public override void Done(Exception e)
-            {
-                exception = e;
-                Done();
-            }
-            private bool done = false;
-
-            public WaitingLink(Func<TValue, TValue> func) : base(func) { }
-
-            internal override void Wait()
-            {
-                if (!done)
-                {
-                    lock (this)
-                    {
-                        if (!done)
-                        {
-                            Monitor.Wait(this);
-                        }
-                    }
-                }
-                if (exception != null)
-                {
-                    throw exception;
-                }
-            }
-        }
-
+        
         private volatile Link endOfChain = new Link(x => x);
         private const int RUNNING = 1;
         private const int STOPPED = 0;
@@ -85,20 +45,23 @@ namespace Prototypist.TaskChain
             Act(x => value);
         }
 
-        public void Act(Func<TValue, TValue> func)
+        public Task Act(Func<TValue, TValue> func)
         {
             var link = new Link(func);
             Run(link);
-            return;
+            return link.taskCompletionSource.Task;
         }
 
-        public void Wait()
-        {
-            var link = new WaitingLink(x => x);
+        public void WaitForIdle() {
+            if (startOfChain != null) {
+                return;
+            }
+
+            var link = new Link(x=>x);
             Run(link);
-            return;
+            link.taskCompletionSource.Task.Wait();
         }
-
+        
         private void Run(Link link)
         {
             while (true)
@@ -152,11 +115,6 @@ namespace Prototypist.TaskChain
                             } while (startOfChain != null && Interlocked.CompareExchange(ref running, RUNNING, STOPPED) == STOPPED);
                         });
                     }
-                }
-
-                else
-                {
-                    link.Wait();
                 }
             }
         }

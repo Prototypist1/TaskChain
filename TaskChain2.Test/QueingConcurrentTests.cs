@@ -23,10 +23,10 @@ namespace Prototypist.TaskChain.Test
             {
                 array[i] = () => target.Act(plusOne);
             }
-
+            
             Parallel.Invoke(array);
 
-            target.Wait();
+            target.WaitForIdle();
             
             Assert.Equal(1000, target.GetValue());
         }
