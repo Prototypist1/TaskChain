@@ -89,7 +89,7 @@ namespace Prototypist.TaskChain
             }
             catch
             {
-                res = default(KeyValue);
+                res = default;
                 return false;
             }
         }

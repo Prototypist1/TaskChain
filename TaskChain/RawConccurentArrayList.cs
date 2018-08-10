@@ -9,7 +9,7 @@ namespace Prototypist.TaskChain
     public class RawConcurrentArrayList<TValue> : IReadOnlyList<TValue>
         where TValue : class
     {
-        private readonly QueueingConcurrent<TValue[][]> backing = new QueueingConcurrent<TValue[][]>(new TValue[5][]);
+        private volatile TValue[][] backing = new TValue[5][];
         private int leadingCount = -1;
         private int lastCount = 0;
         private readonly int innerSize = 20;
@@ -37,7 +37,7 @@ namespace Prototypist.TaskChain
             {
                 var myOuterIndex = i / innerSize;
                 var myInnerIndex = i % innerSize;
-                return backing.GetValue()[myOuterIndex][myInnerIndex] != null;
+                return backing[myOuterIndex][myInnerIndex] != null;
             }
             catch
             {
@@ -62,25 +62,23 @@ namespace Prototypist.TaskChain
             var myIndex = Interlocked.Increment(ref leadingCount);
             var myOuterIndex = myIndex / innerSize;
             var myInnerIndex = myIndex % innerSize;
-            if (backing.GetValue().Length <= myOuterIndex)
+            if (backing.Length <= myOuterIndex)
             {
-                // expand
-                backing.Act(x =>
+                lock(backing)
                 {
-                    if (x.Length <= myOuterIndex)
+                    if (backing.Length <= myOuterIndex)
                     {
-                        var replace = new TValue[x.Length + outerStep][];
-                        for (var i = 0; i < x.Length; i++)
+                        var replace = new TValue[backing.Length + outerStep][];
+                        for (var i = 0; i < backing.Length; i++)
                         {
-                            replace[i] = x[i];
+                            replace[i] = backing[i];
                         }
-                        return replace;
+                        backing = replace;
                     }
-                    return x;
-                });
+                };
             }
-            Interlocked.CompareExchange(ref backing.GetValue()[myOuterIndex], new TValue[innerSize], null);
-            backing.GetValue()[myOuterIndex][myInnerIndex] = value;
+            Interlocked.CompareExchange(ref backing[myOuterIndex], new TValue[innerSize], null);
+            backing[myOuterIndex][myInnerIndex] = value;
             Interlocked.CompareExchange(ref lastCount, myIndex + 1, myIndex);
         }
 
@@ -90,12 +88,12 @@ namespace Prototypist.TaskChain
             {
                 var myOuterIndex = i / innerSize;
                 var myInnerIndex = i % innerSize;
-                value = backing.GetValue()[myOuterIndex][myInnerIndex];
+                value = backing[myOuterIndex][myInnerIndex];
                 return value != null;
             }
             catch
             {
-                value = default(TValue);
+                value = default;
                 return false;
             }
         }

@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Prototypist.TaskChain.DataTypes
 {
@@ -32,7 +33,7 @@ namespace Prototypist.TaskChain.DataTypes
         {
             try
             {
-                res = backing.GetNodeOrThrow(key).value.GetValue();
+                res = backing.GetNodeOrThrow(key).value.Read();
                 return true;
             }
             catch {
@@ -41,14 +42,14 @@ namespace Prototypist.TaskChain.DataTypes
             }
         }
 
-        public bool TryUpdate(TKey key, TValue newValue)
+        public async Task<bool> TryUpdate(TKey key, TValue newValue)
         {
             try
             {
                 NoModificationDuringEnumeration();
                 if (backing.TryGet(key, out var item))
                 {
-                    item.value.SetValue(newValue);
+                    await item.value.SetValue(newValue);
                     return true;
                 }
                 return false;
@@ -58,14 +59,14 @@ namespace Prototypist.TaskChain.DataTypes
                 Interlocked.Decrement(ref enumerationCount);
             }
         }
-        public bool TryDo(TKey key, Func<TValue, TValue> action)
+        public async Task<bool> TryDo(TKey key, Func<TValue, TValue> action)
         {
             try
             {
                 NoModificationDuringEnumeration();
                 if (backing.TryGet(key, out var item))
                 {
-                    item.value.Act(action);
+                    await item.value.Act(action);
                     return true;
                 }
                 return false;
@@ -95,7 +96,7 @@ namespace Prototypist.TaskChain.DataTypes
             {
                 NoModificationDuringEnumeration();
                 var toAdd = new RawConcurrentIndexed<TKey, QueueingConcurrent<TValue>>.KeyValue(key, new QueueingConcurrent<TValue>(fallback));
-                return backing.GetOrAdd(toAdd).value.GetValue();
+                return backing.GetOrAdd(toAdd).value.Read();
             }
             finally
             {
@@ -112,7 +113,7 @@ namespace Prototypist.TaskChain.DataTypes
                 if (ReferenceEquals(current, toAdd)) {
                     buildable.Build(fallback());
                 }
-                return current.value.GetValue();
+                return current.value.Read();
             }
             finally
             {
@@ -157,7 +158,7 @@ namespace Prototypist.TaskChain.DataTypes
                 Interlocked.Decrement(ref enumerationCount);
             }
         }
-        public void DoOrAdd(TKey key, Func<TValue, TValue> action, TValue fallback) {
+        public Task<TValue> DoOrAdd(TKey key, Func<TValue, TValue> action, TValue fallback) {
             try
             {
                 NoModificationDuringEnumeration();
@@ -165,15 +166,16 @@ namespace Prototypist.TaskChain.DataTypes
                 var current = backing.GetOrAdd(toAdd);
                 if (!ReferenceEquals(current, toAdd))
                 {
-                    current.value.Act(action);
+                    return current.value.Act(action);
                 }
+                return Task.FromResult(fallback);
             }
             finally
             {
                 Interlocked.Decrement(ref enumerationCount);
             }
         }
-        public void DoOrAdd(TKey key, Func<TValue, TValue> action, Func<TValue> fallback) {
+        public Task<TValue> DoOrAdd(TKey key, Func<TValue, TValue> action, Func<TValue> fallback) {
             try
             {
                 NoModificationDuringEnumeration();
@@ -182,11 +184,13 @@ namespace Prototypist.TaskChain.DataTypes
                 var current = backing.GetOrAdd(toAdd);
                 if (ReferenceEquals(current, toAdd))
                 {
-                    buildable.Build(fallback());
+                    var fallbackValue = fallback();
+                    buildable.Build(fallbackValue);
+                    return Task.FromResult(fallbackValue);
                 }
                 else
                 {
-                    current.value.Act(action);
+                    return current.value.Act(action);
                 }
             }
             finally
@@ -201,7 +205,7 @@ namespace Prototypist.TaskChain.DataTypes
             SpinWait.SpinUntil(() => Volatile.Read(ref enumerationCount) % enumerationAdd == 0);
             foreach (var item in backing)
             {
-                yield return new KeyValuePair<TKey, TValue>(item.Key, item.Value.GetValue());
+                yield return new KeyValuePair<TKey, TValue>(item.Key, item.Value.Read());
             }
             Interlocked.Add(ref enumerationCount, -enumerationAdd);
         }
@@ -210,9 +214,9 @@ namespace Prototypist.TaskChain.DataTypes
     }
 
     public static class ConcurrentHashIndexedTreeExtensions {
-        public static void UpdateOrThrow<TKey, TValue>(this ConcurrentIndexed<TKey, TValue> self, TKey key, TValue newValue)
+        public static async Task UpdateOrThrow<TKey, TValue>(this ConcurrentIndexed<TKey, TValue> self, TKey key, TValue newValue)
         {
-            if (self.TryUpdate(key, newValue))
+            if (await self.TryUpdate(key, newValue))
             {
                 return;
             }
@@ -224,8 +228,8 @@ namespace Prototypist.TaskChain.DataTypes
             }
             throw new Exception("No item found for that key");
         }
-        public static void DoOrThrow<TKey, TValue>(this ConcurrentIndexed<TKey, TValue> self, TKey key, Func<TValue, TValue> action) {
-            if (self.TryDo(key, action)) {
+        public static async Task DoOrThrow<TKey, TValue>(this ConcurrentIndexed<TKey, TValue> self, TKey key, Func<TValue, TValue> action) {
+            if (await self.TryDo(key, action)) {
                 return;
             }
             throw new Exception("No item found for that key");
@@ -240,29 +244,9 @@ namespace Prototypist.TaskChain.DataTypes
                 return false;
             }
         }
-        public static TValue UpdateOrAdd<TKey, TValue>(this ConcurrentIndexed<TKey, TValue> self, TKey key, Func<TValue, TValue> function, TValue fallback) {
-            var res = fallback;
-            self.DoOrAdd(key, x => {
-                res = function(x);
-                return res;
-                } , fallback);
-            return res;
-        }
-        public static TValue UpdateOrAdd<TKey, TValue>(this ConcurrentIndexed<TKey, TValue> self, TKey key, Func<TValue, TValue> function, Func<TValue> fallback) {
+        public static async Task<TValue> UpdateOrThrow<TKey, TValue>(this ConcurrentIndexed<TKey, TValue> self, TKey key, Func<TValue, TValue> function) {
             var res = default(TValue);
-            self.DoOrAdd(key, x =>
-            {
-                res = function(x);
-                return res;
-            },()=> {
-                res = fallback();
-                return res;
-                });
-            return res;
-        }
-        public static TValue UpdateOrThrow<TKey, TValue>(this ConcurrentIndexed<TKey, TValue> self, TKey key, Func<TValue, TValue> function) {
-            var res = default(TValue);
-            if (self.TryDo(key, x =>
+            if (await self.TryDo(key, x =>
             {
                 res = function(x);
                 return res;

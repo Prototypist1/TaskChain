@@ -7,16 +7,16 @@ namespace Prototypist.TaskChain
 
     public class QueueingConcurrent<TValue>
     {
-        private volatile object value;
+        protected volatile object value;
 
         protected class Link
         {
             public readonly Func<TValue, TValue> func;
             public volatile Link next;
-            public TaskCompletionSource<bool> taskCompletionSource = new TaskCompletionSource<bool>();
-            public void Done()
+            public TaskCompletionSource<TValue> taskCompletionSource = new TaskCompletionSource<TValue>();
+            public void Done(TValue res)
             {
-                taskCompletionSource.SetResult(true);
+                taskCompletionSource.SetResult(res);
             }
             public void Done(Exception e)
             {
@@ -35,36 +35,27 @@ namespace Prototypist.TaskChain
 
         public QueueingConcurrent(TValue value) => this.value = value;
 
-        public virtual TValue GetValue()
+        public virtual TValue Read()
         {
             return (TValue)value;
         }
 
-        public void SetValue(TValue value)
+        public Task<TValue> SetValue(TValue value)
         {
-            Act(x => value);
+            return Act(x => value);
         }
 
-        public Task Act(Func<TValue, TValue> func)
+        public Task<TValue> Act(Func<TValue, TValue> func)
         {
-            var link = new Link(func);
-            Run(link);
-            return link.taskCompletionSource.Task;
+            return Run(new Link(func));
         }
 
-        public void WaitForIdle()
+        public virtual Task<TValue> EnqueRead()
         {
-            if (startOfChain != null)
-            {
-                return;
-            }
-
-            var link = new Link(x => x);
-            Run(link);
-            link.taskCompletionSource.Task.Wait();
+            return Run(new Link(x => x));
         }
 
-        private void Run(Link link)
+        private Task<TValue> Run(Link link)
         {
             while (true)
             {
@@ -72,19 +63,18 @@ namespace Prototypist.TaskChain
                 {
                     endOfChain = endOfChain.next;
                     Interlocked.CompareExchange(ref startOfChain, link, null);
-                    DoWork();
-                    return;
+                    return DoWork();
                 }
             }
 
-            void DoWork()
+            Task<TValue> DoWork()
             {
                 if (Interlocked.CompareExchange(ref running, RUNNING, STOPPED) == STOPPED)
                 {
                     try
                     {
                         value = startOfChain.func((TValue)value);
-                        startOfChain.Done();
+                        startOfChain.Done((TValue)value);
                     }
                     catch (Exception e)
                     {
@@ -104,7 +94,7 @@ namespace Prototypist.TaskChain
                                     try
                                     {
                                         value = startOfChain.func((TValue)value);
-                                        startOfChain.Done();
+                                        startOfChain.Done((TValue)value);
                                     }
                                     catch (Exception e)
                                     {
@@ -118,33 +108,8 @@ namespace Prototypist.TaskChain
                         });
                     }
                 }
+                return link.taskCompletionSource.Task;
             }
-        }
-    }
-
-    public class BuildableQueueingConcurrent<TValue> : QueueingConcurrent<TValue>
-    {
-        ManualResetEventSlim eventSlim = new ManualResetEventSlim();
-        private volatile object build;
-        public BuildableQueueingConcurrent() : base(default)
-        {
-            startOfChain = new Link(x =>
-            {
-                eventSlim.Wait();
-                return (TValue)build;
-            });
-            endOfChain = startOfChain;
-        }
-
-        public void Build(TValue value) {
-            build = value;
-            eventSlim.Set();
-        }
-
-        public override TValue GetValue()
-        {
-            eventSlim.Wait();
-            return base.GetValue();
         }
     }
 }

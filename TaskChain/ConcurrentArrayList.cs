@@ -32,13 +32,13 @@ namespace Prototypist.TaskChain.DataTypes
             }
         }
 
-        public bool TryGet(int i, out TValue value)
+        public bool TryGet(int i, out QueueingConcurrent<TValue> value)
         {
             try
             {
                 if (backing.TryGet(i, out var res))
                 {
-                    value = res.GetValue();
+                    value = res;
                     return true;
                 }
                 value = default;
@@ -103,7 +103,7 @@ namespace Prototypist.TaskChain.DataTypes
             {
                 if (TryGet(index, out var res))
                 {
-                    return res;
+                    return res.Read();
                 }
                 throw new IndexOutOfRangeException();
             }
@@ -125,7 +125,7 @@ namespace Prototypist.TaskChain.DataTypes
             SpinWait.SpinUntil(()=> Volatile.Read(ref enumerationCount) % enumerationAdd == 0);
             foreach (var item in backing)
             {
-                yield return item.GetValue();
+                yield return item.Read();
             }
             Interlocked.Add(ref enumerationCount, -enumerationAdd);
         }
