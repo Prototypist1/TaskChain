@@ -6,7 +6,7 @@ using System.Threading;
 
 namespace Prototypist.TaskChain
 {
-    public class RawConcurrentIndexed<TKey, TValue> : IEnumerable<KeyValuePair<TKey, TValue>>
+    public class RawConcurrentIndexed<TKey, TValue> : IReadOnlyDictionary<TKey, TValue>
     {
         public class KeyValue
         {
@@ -23,10 +23,21 @@ namespace Prototypist.TaskChain
             }
         }
 
+        private volatile int count;
         private const int Size = 128;
         private readonly KeyValue[] tree = new KeyValue[Size];
 
-        public bool Contains(TKey key)
+        public int Count {
+            get {
+                return count;
+            }
+        }
+
+
+
+        public TValue this[TKey key] => GetNodeOrThrow(key).value;
+
+        public bool ContainsKey(TKey key)
         {
             var hash = key.GetHashCode();
             var a = ((uint)hash) % Size;
@@ -64,6 +75,7 @@ namespace Prototypist.TaskChain
             var at = tree[a];
             if (at == null && Interlocked.CompareExchange(ref tree[a], node, null) == null)
             {
+                Interlocked.Increment(ref count);
                 return node;
             }
             while (true)
@@ -74,6 +86,7 @@ namespace Prototypist.TaskChain
                 }
                 if (at.next == null && Interlocked.CompareExchange(ref at.next, node, null) == null)
                 {
+                    Interlocked.Increment(ref count);
                     return node;
                 }
                 at = at.next;
@@ -94,6 +107,20 @@ namespace Prototypist.TaskChain
             }
         }
 
+        public bool TryGetValue(TKey key, out TValue value)
+        {
+            try
+            {
+                value = GetNodeOrThrow(key).value;
+                return true;
+            }
+            catch
+            {
+                value = default;
+                return false;
+            }
+        }
+
         public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
         {
             foreach (var l1 in tree)
@@ -110,7 +137,28 @@ namespace Prototypist.TaskChain
             }
         }
 
+        public IEnumerable<TKey> Keys
+        {
+            get
+            {
+                foreach (var item in this)
+                {
+                    yield return item.Key;
+                }
+            }
+        }
+
+        public IEnumerable<TValue> Values {
+            get {
+                foreach (var item in this)
+                {
+                    yield return item.Value;
+                }
+            }
+        }
+
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
     }
 }
 

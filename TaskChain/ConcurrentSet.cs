@@ -24,7 +24,7 @@ namespace Prototypist.TaskChain.DataTypes
 
         public bool Contains(T value)
         {
-            return backing.Contains(value);
+            return backing.ContainsKey(value);
         }
 
         // TODO some of these are extensions

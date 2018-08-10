@@ -26,8 +26,6 @@ namespace Prototypist.TaskChain
                     lastCountCache = Volatile.Read(ref lastCount);
                 }
                 return lastCount;
-
-
             }
         }
 

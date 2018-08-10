@@ -26,7 +26,7 @@ namespace Prototypist.TaskChain.DataTypes
         }
 
         public bool ContainsKey(TKey key) {
-            return backing.Contains(key);
+            return backing.ContainsKey(key);
         }
 
         public bool TryGet(TKey key, out TValue res)
