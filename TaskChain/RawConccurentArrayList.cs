@@ -62,20 +62,19 @@ namespace Prototypist.TaskChain
             var myIndex = Interlocked.Increment(ref leadingCount);
             var myOuterIndex = myIndex / innerSize;
             var myInnerIndex = myIndex % innerSize;
+            
             if (backing.Length <= myOuterIndex)
             {
-                lock(backing)
+                var backingCache = backing;
+                var replace = new TValue[backing.Length + outerStep][];
+                for (var i = 0; i < backing.Length; i++)
                 {
-                    if (backing.Length <= myOuterIndex)
-                    {
-                        var replace = new TValue[backing.Length + outerStep][];
-                        for (var i = 0; i < backing.Length; i++)
-                        {
-                            replace[i] = backing[i];
-                        }
-                        backing = replace;
-                    }
-                };
+                    replace[i] = backing[i];
+                }
+                do
+                {
+                    backingCache = Interlocked.CompareExchange(ref backing, replace, backingCache);
+                } while (backingCache.Length <= myOuterIndex);
             }
             Interlocked.CompareExchange(ref backing[myOuterIndex], new TValue[innerSize], null);
             backing[myOuterIndex][myInnerIndex] = value;
