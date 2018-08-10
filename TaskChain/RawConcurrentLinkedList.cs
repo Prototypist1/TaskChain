@@ -1,10 +1,11 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
 
 namespace Prototypist.TaskChain
 {
-    public class RawConcurrentLinkedList<TValue>: IReadOnlyCollection<TValue>
+    public class RawConcurrentLinkedList<TValue> : IReadOnlyList<TValue>
     {
         protected volatile Link startOfChain;
         protected volatile Link endOfChain = new Link();
@@ -33,6 +34,33 @@ namespace Prototypist.TaskChain
         public int Count {
             get {
                 return count;
+            }
+        }
+
+        private Link Get(int i) {
+            if (i < 0) {
+                throw new IndexOutOfRangeException($"index: {i} is not expected to be to be less than 0");
+            }
+            var at = startOfChain;
+            var myIndex = 0;
+            while (true) { 
+                if (myIndex == i) {
+                    return at;
+                }
+                if (at.next == null )
+                {
+                    throw new IndexOutOfRangeException($"index: {i} requested, only {myIndex} items avaible");
+                }
+                at = at.next;
+                myIndex++;
+            }
+        }
+
+        public TValue this[int index] { get {
+                return Get(index).Value;
+            }
+            set {
+                Get(index).Value = value;
             }
         }
 
