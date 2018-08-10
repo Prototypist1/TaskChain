@@ -17,94 +17,93 @@ namespace Prototypist.TaskChain.Test
             var target = new QueueingConcurrent<int>(0);
 
             int plusOne(int x) => x + 1;
-            
+            Task t = Task.CompletedTask;
             for (int i = 0; i < 1000; i++)
             {
-                target.Act(plusOne);
+                t = target.Act(plusOne);
             }
-            
-            target.WaitForIdle();
-            
+            t.Wait();
+
             Assert.Equal(1000, target.GetValue());
         }
 
-        [Fact]
-        public void CountIncrement()
-        {
-            var value = 0;
+        //[Fact]
+        //public void CountIncrement()
+        //{
+        //    var value = 0;
 
-            var array = new Action[1000];
-            for (int i = 0; i < 1000; i++)
-            {
-                array[i] = () => Interlocked.Increment(ref value);
-            }
+        //    var array = new Action[1000];
+        //    for (int i = 0; i < 1000; i++)
+        //    {
+        //        array[i] = () => Interlocked.Increment(ref value);
+        //    }
 
-            Parallel.Invoke(array);
+        //    Parallel.Invoke(array);
 
-            Assert.Equal(1000, value);
-        }
+        //    Assert.Equal(1000, value);
+        //}
 
-        [Fact]
-        public void CountLock()
-        {
-            var value = 0;
-            object o = new object();
+        //[Fact]
+        //public void CountLock()
+        //{
+        //    var value = 0;
+        //    object o = new object();
 
-            var array = new Action[1000];
-            for (int i = 0; i < 1000; i++)
-            {
-                array[i] = () =>
-                {
-                    lock (o)
-                    {
-                        value++;
-                    }
-                };
-            }
+        //    var array = new Action[1000];
+        //    for (int i = 0; i < 1000; i++)
+        //    {
+        //        array[i] = () =>
+        //        {
+        //            lock (o)
+        //            {
+        //                value++;
+        //            }
+        //        };
+        //    }
 
-            Parallel.Invoke(array);
+        //    Parallel.Invoke(array);
 
-            Assert.Equal(1000, value);
-        }
+        //    Assert.Equal(1000, value);
+        //}
 
-        [Fact]
-        public void Inseries()
-        {
-            var value = 0;
-            object o = new object();
+        //[Fact]
+        //public void Inseries()
+        //{
+        //    var value = 0;
+        //    object o = new object();
 
-            var array = new Action[1000];
-            for (int i = 0; i < 1000; i++)
-            {
-                array[i] = () =>
-                {
-                    value++;
-                };
-            }
+        //    var array = new Action[1000];
+        //    for (int i = 0; i < 1000; i++)
+        //    {
+        //        array[i] = () =>
+        //        {
+        //            value++;
+        //        };
+        //    }
 
-            foreach (var item in array)
-            {
-                item();
-            }
+        //    foreach (var item in array)
+        //    {
+        //        item();
+        //    }
 
-            Assert.Equal(1000, value);
-        }
+        //    Assert.Equal(1000, value);
+        //}
 
-        [Fact]
-        public void Baseline()
-        {
-            var value = 0;
-            object o = new object();
+        //[Fact]
+        //public void Baseline()
+        //{
+        //    var value = 0;
+        //    object o = new object();
 
-            var array = new Action[1000];
-            for (int i = 0; i < 1000; i++)
-            {
-                array[i] = () =>
-                {
-                    value++;
-                };
-            }
-            
-        }
+        //    var array = new Action[1000];
+        //    for (int i = 0; i < 1000; i++)
+        //    {
+        //        array[i] = () =>
+        //        {
+        //            value++;
+        //        };
+        //    }
+
+        //}
     }
 }
