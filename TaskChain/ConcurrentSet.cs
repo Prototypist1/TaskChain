@@ -7,11 +7,13 @@ using System.Threading;
 namespace Prototypist.TaskChain.DataTypes
 {
 
-    public class ConcurrentSet<T> : IEnumerable<T>
+    public class ConcurrentSet<T> : IReadOnlyCollection<T>
     {
         private readonly RawConcurrentIndexed<T, T> backing = new RawConcurrentIndexed<T, T>();
         private const long enumerationAdd = 1_000_000_000;
         private long enumerationCount = 0;
+
+        public int Count => backing.Count;
 
         private void NoModificationDuringEnumeration()
         {
