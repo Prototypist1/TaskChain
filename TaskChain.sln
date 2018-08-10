@@ -5,9 +5,9 @@ VisualStudioVersion = 15.0.27703.2042
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{B4A08F75-5DD0-40FE-A3B8-9E0F7FD3C85B}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TaskChain2", "TaskChain2\TaskChain2.csproj", "{C0D5D79A-A89B-47EF-AEE4-701541673961}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TaskChain", "TaskChain\TaskChain.csproj", "{C0D5D79A-A89B-47EF-AEE4-701541673961}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TaskChain2.Test", "TaskChain2.Test\TaskChain2.Test.csproj", "{D293D710-2B3C-4555-B41B-BA95B525717B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TaskChain.Test", "TaskChain.Test\TaskChain.Test.csproj", "{D293D710-2B3C-4555-B41B-BA95B525717B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

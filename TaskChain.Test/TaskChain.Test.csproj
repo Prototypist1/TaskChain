@@ -22,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\TaskChain2\TaskChain2.csproj" />
+    <ProjectReference Include="..\TaskChain\TaskChain.csproj" />
   </ItemGroup>
 
 </Project>
