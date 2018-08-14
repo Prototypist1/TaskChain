@@ -60,7 +60,7 @@ namespace Prototypist.TaskChain
 
         protected abstract class AbstractLink
         {
-            public volatile Link next;
+            public volatile AbstractLink next;
             public TaskCompletionSource<TValue> taskCompletionSource = new TaskCompletionSource<TValue>();
             public abstract Task<TValue> Do(TValue value);
             
@@ -133,13 +133,17 @@ namespace Prototypist.TaskChain
         {
             return Run(new Link(func));
         }
+        public Task<TValue> ActAsync(Func<TValue, Task<TValue>> func)
+        {
+            return Run(new LinkAsync(func));
+        }
 
         public virtual Task<TValue> EnqueRead()
         {
             return Run(new Link(x => x));
         }
 
-        private Task<TValue> Run(Link link)
+        private Task<TValue> Run(AbstractLink link)
         {
             while (true)
             {
