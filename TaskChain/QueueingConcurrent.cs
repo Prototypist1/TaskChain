@@ -21,10 +21,8 @@ namespace Prototypist.TaskChain
         private readonly FirstComeFirstServe firstComeFirstServe;
         private readonly Func<object[], object[]> func;
         private readonly Task<object>[] inputs;
-        public volatile Link next;
         private readonly int i;
         public TaskCompletionSource<object> MyValue = new TaskCompletionSource<object>();
-        public TaskCompletionSource<TValue> taskCompletionSource = new TaskCompletionSource<TValue>();
 
         public CrossSyncLink(FirstComeFirstServe firstComeFirstServe, Func<object[], object[]> func, Task<object>[] inputs, int i)
         {
@@ -34,7 +32,7 @@ namespace Prototypist.TaskChain
             this.i = i;
         }
 
-        public async Task<TValue> Do(object value)
+        public async Task<TValue> Do<TValue>(object value)
         {
 
             MyValue.SetResult(value);
@@ -50,9 +48,7 @@ namespace Prototypist.TaskChain
                     thing.SetException(e);
                 }
             }
-            var res = (TValue)(await firstComeFirstServe.main)[i];
-            taskCompletionSource.SetResult(res);
-            return res;
+            return (TValue)(await firstComeFirstServe.main)[i]; ;
         }
 
     }
@@ -62,12 +58,19 @@ namespace Prototypist.TaskChain
     {
         protected volatile object value;
 
-        protected class Link
+        protected abstract class AbstractLink
         {
-            private readonly Func<TValue, TValue> func;
             public volatile Link next;
             public TaskCompletionSource<TValue> taskCompletionSource = new TaskCompletionSource<TValue>();
-            public Task<TValue> Do(TValue value)
+            public abstract Task<TValue> Do(TValue value);
+            
+
+        }
+
+        protected class Link: AbstractLink
+        {
+            private readonly Func<TValue, TValue> func;
+            public override Task<TValue> Do(TValue value)
             {
                 try
                 {
@@ -86,11 +89,33 @@ namespace Prototypist.TaskChain
 
         }
 
-        protected volatile Link endOfChain = new Link(x => x);
+        protected class LinkAsync : AbstractLink
+        {
+            private readonly Func<TValue, Task<TValue>> func;
+            public override async Task<TValue> Do(TValue value)
+            {
+                try
+                {
+                    var res = await func(value);
+                    taskCompletionSource.SetResult(res);
+                    return res;
+                }
+                catch (Exception e)
+                {
+                    taskCompletionSource.SetException(e);
+                    throw;
+                }
+            }
+
+            public LinkAsync(Func<TValue, Task<TValue>> func) => this.func = func ?? throw new ArgumentNullException(nameof(func));
+
+        }
+
+        protected volatile AbstractLink endOfChain = new Link(x => x);
         private const int RUNNING = 1;
         private const int STOPPED = 0;
         private int running = STOPPED;
-        protected volatile Link startOfChain;
+        protected volatile AbstractLink startOfChain;
 
         public QueueingConcurrent(TValue value) => this.value = value;
 
