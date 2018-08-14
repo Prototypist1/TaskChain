@@ -9,7 +9,7 @@ namespace Prototypist.TaskChain
     public abstract class QueueingConcurrent
     {
         public abstract Func<bool> GetTryEnqueue(Func<object, Task<object>> func);
-        public abstract void TryStart();
+        public abstract void TryProcess();
 
         private class FirstComeFirstServe
         {
@@ -61,7 +61,6 @@ namespace Prototypist.TaskChain
         // ⚠⚠⚠ super unsafe, nothing like type checking
         public static Task<object[]> MultiEnqueue(QueueingConcurrent[] concurrents, Func<object[],object[]> function) {
             
-            
             var firstComeFirstServe = new FirstComeFirstServe();
 
             var myValues = new TaskCompletionSource<object>[concurrents.Length];
@@ -73,7 +72,7 @@ namespace Prototypist.TaskChain
 
             var inputs = myValues.Select(x => x.Task).ToArray();
 
-            bool done = false;
+            var done = false;
             while (!done){
                 var gotAll = new TaskCompletionSource<bool>();
                 
@@ -89,17 +88,13 @@ namespace Prototypist.TaskChain
 
             foreach (var concurrent in concurrents)
             {
-                concurrent.TryStart();
+                concurrent.TryProcess();
             }
 
             return firstComeFirstServe.main;
         }
     }
-
-
     
-
-
     public class QueueingConcurrent<TValue>: QueueingConcurrent
     {
         protected volatile object value;
@@ -177,6 +172,7 @@ namespace Prototypist.TaskChain
         {
             return Run(new Link(func));
         }
+
         public async Task<TValue> ActAsync(Func<TValue, Task<TValue>> func)
         {
             return await Run(new LinkAsync(func));
@@ -187,6 +183,22 @@ namespace Prototypist.TaskChain
             return Run(new Link(x => x));
         }
         
+        // goodbye type safety 👋
+        public override Func<bool> GetTryEnqueue(Func<object, Task<object>> func)
+        {
+            var link = new LinkAsync(async (x) => (TValue)await func(x));
+            var localEnd = endOfChain;
+            return () =>
+            {
+                if (Interlocked.CompareExchange(ref localEnd.next, link, null) == null)
+                {
+                    endOfChain = endOfChain.next;
+                    return true;
+                }
+                return false;
+            };
+        }
+
         private Task<TValue> Run(AbstractLink link)
         {
             while (true)
@@ -206,25 +218,10 @@ namespace Prototypist.TaskChain
                     value = startOfChain.Do((TValue)value).Result;
                     startOfChain = startOfChain.next;
                     running = STOPPED;
-                    TryStart();
+                    TryProcess();
                 }
                 return link.taskCompletionSource.Task;
             }
-        }
-
-        // goodbye type safety 👋
-        public override Func<bool> GetTryEnqueue(Func<object, Task<object>> func) {
-            var link = new LinkAsync(async (x)=> (TValue)await func(x));
-            var localEnd = endOfChain;
-            return () =>
-            {
-                if (Interlocked.CompareExchange(ref localEnd.next, link, null) == null)
-                {
-                    endOfChain = endOfChain.next;
-                    return true;
-                }
-                return false;
-            };
         }
         
         private async Task<TValue> RunAsync(AbstractLink link)
@@ -246,35 +243,33 @@ namespace Prototypist.TaskChain
                     value = await startOfChain.Do((TValue)value);
                     startOfChain = startOfChain.next;
                     running = STOPPED;
-                    TryStart();
+                    TryProcess();
                 }
                 return await link.taskCompletionSource.Task;
             }
         }
 
-        public override void TryStart()
+        public override void TryProcess()
         {
             if (startOfChain != null && Interlocked.CompareExchange(ref running, RUNNING, STOPPED) == STOPPED)
             {
-#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
                 Task.Run(Process);
-#pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
             }
-        }
 
-        async void Process()
-        {
-            do
+            async void Process()
             {
                 do
                 {
-                    value = await startOfChain.Do((TValue)value);
-                    startOfChain = startOfChain.next;
-                } while (startOfChain != null);
-                running = STOPPED;
-            } while (startOfChain != null && Interlocked.CompareExchange(ref running, RUNNING, STOPPED) == STOPPED);
+                    do
+                    {
+                        value = await startOfChain.Do((TValue)value);
+                        startOfChain = startOfChain.next;
+                    } while (startOfChain != null);
+                    running = STOPPED;
+                } while (startOfChain != null && Interlocked.CompareExchange(ref running, RUNNING, STOPPED) == STOPPED);
+            }
         }
-
+        
     }
 }
 
