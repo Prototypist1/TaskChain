@@ -85,8 +85,44 @@ namespace Prototypist.TaskChain
             concurrent2.TryProcess();
             
             return firstComeFirstServe.main;
-        } 
-        
+        }
+
+        public static Task<Tuple<T1, T2, T3>> Act<T1, T2, T3>(QueueingConcurrent<T1> concurrent1, QueueingConcurrent<T2> concurrent2, QueueingConcurrent<T3> concurrent3, Func<Tuple<T1, T2, T3>, Tuple<T1, T2, T3>> function)
+        {
+
+            var firstComeFirstServe = new FirstComeFirstServe<Tuple<T1, T2, T3>>();
+
+            var myValues1 = new TaskCompletionSource<T1>();
+            var myValues2 = new TaskCompletionSource<T2>();
+            var myValues3 = new TaskCompletionSource<T3>();
+
+            async Task<Tuple<T1, T2, T3>> GetInputs()
+            {
+                return new Tuple<T1, T2, T3>(await myValues1.Task, await myValues2.Task, await myValues3.Task);
+            }
+
+            var inputs = GetInputs();
+
+            var done = false;
+            while (!done)
+            {
+                var gotAll = new TaskCompletionSource<bool>();
+
+                var tryEnqueues1 = concurrent1.GetTryEnqueue(new CrossSyncLink<T1, Tuple<T1, T2, T3>>(firstComeFirstServe, function, inputs, x => x.Item1, myValues1, gotAll.Task).Do);
+                var tryEnqueues2 = concurrent2.GetTryEnqueue(new CrossSyncLink<T2, Tuple<T1, T2, T3>>(firstComeFirstServe, function, inputs, x => x.Item2, myValues2, gotAll.Task).Do);
+                var tryEnqueues3 = concurrent3.GetTryEnqueue(new CrossSyncLink<T3, Tuple<T1, T2, T3>>(firstComeFirstServe, function, inputs, x => x.Item3, myValues3, gotAll.Task).Do);
+
+                done = tryEnqueues1() && tryEnqueues2() && tryEnqueues3();
+                gotAll.SetResult(done);
+            }
+
+            concurrent1.TryProcess();
+            concurrent2.TryProcess();
+            concurrent3.TryProcess();
+
+            return firstComeFirstServe.main;
+        }
+
     }
     
     public class QueueingConcurrent<TValue>
