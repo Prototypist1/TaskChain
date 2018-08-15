@@ -6,96 +6,90 @@ using System.Threading.Tasks;
 namespace Prototypist.TaskChain
 {
 
-    public abstract class QueueingConcurrent
+    public static class QueueingConcurrent
     {
-        public abstract Func<bool> GetTryEnqueue(Func<object, Task<object>> func);
-        public abstract void TryProcess();
 
-        private class FirstComeFirstServe
+        private class FirstComeFirstServe<Tinputs>
         {
-            public Task<object[]> main;
+            public Task<Tinputs> main;
         }
 
-        private class CrossSyncLink
+        private class CrossSyncLink<T,TInputs>
         {
-            private readonly Task<bool> GotAll;
-            private readonly FirstComeFirstServe firstComeFirstServe;
-            private readonly Func<object[], object[]> func;
-            private readonly Task<object>[] inputs;
-            private readonly int i;
-            public TaskCompletionSource<object> MyValue = new TaskCompletionSource<object>();
+            private Task<bool> GotAll { get; }
+            private FirstComeFirstServe<TInputs> FirstComeFirstServe { get; }
+            private Func<TInputs, TInputs> Func { get; }
+            private Task<TInputs> Inputs { get; }
+            private Func<TInputs, T> Covert { get; }
+            private TaskCompletionSource<T> MyValue { get; }
 
-            public CrossSyncLink(FirstComeFirstServe firstComeFirstServe, Func<object[], object[]> func, Task<object>[] inputs, int i, TaskCompletionSource<object> myValue, Task<bool> gotAll)
+            public CrossSyncLink(FirstComeFirstServe<TInputs> firstComeFirstServe, Func<TInputs, TInputs> func, Task<TInputs> inputs, Func<TInputs,T> covert, TaskCompletionSource<T> myValue, Task<bool> gotAll)
             {
-                this.firstComeFirstServe = firstComeFirstServe ?? throw new ArgumentNullException(nameof(firstComeFirstServe));
-                this.func = func ?? throw new ArgumentNullException(nameof(func));
-                this.inputs = inputs ?? throw new ArgumentNullException(nameof(inputs));
-                this.i = i;
+                FirstComeFirstServe = firstComeFirstServe ?? throw new ArgumentNullException(nameof(firstComeFirstServe));
+                Func = func ?? throw new ArgumentNullException(nameof(func));
+                Inputs = inputs ?? throw new ArgumentNullException(nameof(inputs));
+                Covert = covert ?? throw new ArgumentNullException(nameof(covert));
                 MyValue = myValue ?? throw new ArgumentNullException(nameof(myValue));
                 GotAll = gotAll ?? throw new ArgumentNullException(nameof(gotAll));
             }
 
-            public async Task<object> Do(object value)
+            public async Task<T> Do(T value)
             {
                 if (await GotAll)
                 {
                     MyValue.SetResult(value);
-                    var thing = new TaskCompletionSource<object[]>();
-                    if (Interlocked.CompareExchange(ref firstComeFirstServe.main, thing.Task, null) == null)
+                    var thing = new TaskCompletionSource<TInputs>();
+                    if (Interlocked.CompareExchange(ref FirstComeFirstServe.main, thing.Task, null) == null)
                     {
                         try
                         {
-                            thing.SetResult(func(await Task.WhenAll(inputs)));
+                            thing.SetResult(Func(await Inputs));
                         }
                         catch (Exception e)
                         {
                             thing.SetException(e);
                         }
                     }
-                    return (await firstComeFirstServe.main)[i]; ;
+                    return Covert(await FirstComeFirstServe.main); ;
                 }
                 return value;
             }
         }
 
-        // ⚠⚠⚠ super unsafe, nothing like type checking
-        public static Task<object[]> MultiEnqueue(QueueingConcurrent[] concurrents, Func<object[],object[]> function) {
+        public static Task<Tuple<T1, T2>> Act<T1, T2>(QueueingConcurrent<T1> concurrent1, QueueingConcurrent<T2> concurrent2, Func<Tuple<T1,T2>,Tuple<T1,T2>> function) {
+
+            var firstComeFirstServe = new FirstComeFirstServe<Tuple<T1, T2>>();
+
+            var myValues1 = new TaskCompletionSource<T1>();
+            var myValues2 = new TaskCompletionSource<T2>();
             
-            var firstComeFirstServe = new FirstComeFirstServe();
-
-            var myValues = new TaskCompletionSource<object>[concurrents.Length];
-
-            for (int i = 0; i < concurrents.Length; i++)
-            {
-                myValues[i] = new TaskCompletionSource<object>();
+            async Task<Tuple<T1, T2>> GetInputs() {
+                return new Tuple<T1, T2>(await myValues1.Task, await myValues2.Task);
             }
 
-            var inputs = myValues.Select(x => x.Task).ToArray();
-
+            var inputs = GetInputs();
+            
             var done = false;
-            while (!done){
+            while (!done)
+            {
                 var gotAll = new TaskCompletionSource<bool>();
                 
-                var tryEnqueues = new Func<bool>[concurrents.Length];
-                for (int i = 0; i < concurrents.Length; i++)
-                {
-                    tryEnqueues[i] = concurrents[i].GetTryEnqueue(new CrossSyncLink(firstComeFirstServe, function, inputs, i, myValues[i], gotAll.Task).Do);
-                }
-
-                done=tryEnqueues.All(x => x());
+                var tryEnqueues1 = concurrent1.GetTryEnqueue(new CrossSyncLink<T1,Tuple<T1,T2>>(firstComeFirstServe, function, inputs, x=>x.Item1, myValues1, gotAll.Task).Do);
+                var tryEnqueues2 = concurrent2.GetTryEnqueue(new CrossSyncLink<T2, Tuple<T1, T2>>(firstComeFirstServe, function, inputs, x => x.Item2, myValues2, gotAll.Task).Do);
+                
+                done = tryEnqueues1() && tryEnqueues2();
                 gotAll.SetResult(done);
             }
 
-            foreach (var concurrent in concurrents)
-            {
-                concurrent.TryProcess();
-            }
-
+            concurrent1.TryProcess();
+            concurrent2.TryProcess();
+            
             return firstComeFirstServe.main;
-        }
+        } 
+        
     }
     
-    public class QueueingConcurrent<TValue>: QueueingConcurrent
+    public class QueueingConcurrent<TValue>
     {
         protected volatile object value;
 
@@ -183,10 +177,9 @@ namespace Prototypist.TaskChain
             return Run(new Link(x => x));
         }
         
-        // goodbye type safety 👋
-        public override Func<bool> GetTryEnqueue(Func<object, Task<object>> func)
+        public Func<bool> GetTryEnqueue(Func<TValue, Task<TValue>> func)
         {
-            var link = new LinkAsync(async (x) => (TValue)await func(x));
+            var link = new LinkAsync(func);
             var localEnd = endOfChain;
             return () =>
             {
@@ -249,7 +242,7 @@ namespace Prototypist.TaskChain
             }
         }
 
-        public override void TryProcess()
+        public void TryProcess()
         {
             if (startOfChain != null && Interlocked.CompareExchange(ref running, RUNNING, STOPPED) == STOPPED)
             {
