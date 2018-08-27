@@ -8,7 +8,7 @@ A lock-less parallel library.
 
 It fills a few holes in `System.Collections.Generic`. Specifically, it has thread safe list, a thread safe set and its dictionary implementation with thread safe delegate methods.
 
-## What thread safe types do it provide?
+## What thread safe types does it provide?
 
 * **`ConcurrentArrayList`** - A list that is thread safe but you cannot remove items. 
 
