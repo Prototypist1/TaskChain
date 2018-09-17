@@ -6,7 +6,7 @@ A lock-less parallel library.
 
 ## Why?
 
-It fills a few holes in `System.Collections.Generic`. Specifically, it has thread safe list, a thread safe set and its dictionary implementation has thread safe delegate methods.
+It fills a few holes in `System.Collections.Generic`. Specifically, it has a thread safe list, a thread safe set and its dictionary implementation has thread safe delegate methods.
 
 ## What thread safe types does it provide?
 
