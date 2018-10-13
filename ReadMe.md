@@ -14,7 +14,7 @@ It fills a few holes in `System.Collections.Generic`. Specifically, it has a thr
 
 * **`ConcurrentSet`** - A thread safe Set.
 
-* **`ConcurrentIndex`** - A thread safe dictionary. Unlike `ConcurrentDictionary`, `ConcurrentIndex` methods that accept delegates are thread safe. However it does lack may of `ConcurrentDictionary` features like `Count` and `Remove`.
+* **`ConcurrentIndex`** - A thread safe dictionary. Unlike `ConcurrentDictionary`, `ConcurrentIndex` methods that accept delegates are thread safe. However it does lack may of `ConcurrentDictionary`s features like `Count` and `Remove`.
 
 * **`QueueingConcurrent<T>`** - Makes an object thread safe by queing code that modify it.
 
