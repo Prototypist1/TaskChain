@@ -5,7 +5,7 @@ namespace Prototypist.TaskChain
 {
     public class BuildableQueueingConcurrent<TValue> : QueueingConcurrent<TValue>
     {
-        ManualResetEventSlim eventSlim = new ManualResetEventSlim();
+        readonly ManualResetEventSlim eventSlim = new ManualResetEventSlim();
         private volatile object build;
         public BuildableQueueingConcurrent() : base(default)
         {

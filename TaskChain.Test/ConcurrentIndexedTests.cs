@@ -66,7 +66,7 @@ namespace Prototypist.TaskChain.Test
                 var thing = new ConcurrentIndexed<int, string>();
 
                 var tasks = new List<Task>();
-                for (var i = 0; i < 100; i = i + 3)
+                for (var i = 0; i < 100; i += 3)
                 {
                     tasks.Add(Task.Run(() => AddUpdate(i)));
                     tasks.Add(Task.Run(() => GetFallback(i + 1)));
@@ -98,7 +98,7 @@ namespace Prototypist.TaskChain.Test
         {
             var target = new ConcurrentIndexed<int, string>();
 
-            Assert.False(target.TryGet(1,out var first));
+            Assert.False(target.TryGet(1,out var _));
 
             target.AddOrThrow(1, "1");
 

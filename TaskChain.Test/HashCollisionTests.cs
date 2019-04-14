@@ -12,7 +12,7 @@ namespace TaskChain.Test
         public class HashTestHelper
         {
             private readonly int hashCode;
-            private int nature;
+            private readonly int nature;
 
             public HashTestHelper(int hashCode, int nature)
             {

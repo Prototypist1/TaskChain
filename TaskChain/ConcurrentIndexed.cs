@@ -216,8 +216,6 @@ namespace Prototypist.TaskChain.DataTypes
             }
         }
 
-
-
         public IEnumerable<TKey> Keys
         {
             get
