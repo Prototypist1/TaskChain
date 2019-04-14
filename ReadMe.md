@@ -6,15 +6,15 @@ A lock-less parallel library.
 
 ## Why?
 
-It fills a few holes in `System.Collections.Generic`. Specifically, it has thread safe list, a thread safe set and its dictionary implementation with thread safe delegate methods.
+It fills a few holes in `System.Collections.Generic`. Specifically, it has a thread safe list, a thread safe set and its dictionary implementation has thread safe delegate methods.
 
-## What thread safe types do it provide?
+## What thread safe types does it provide?
 
 * **`ConcurrentArrayList`** - A list that is thread safe but you cannot remove items. 
 
 * **`ConcurrentSet`** - A thread safe Set.
 
-* **`ConcurrentIndex`** - A thread safe dictionary. Unlike `ConcurrentDictionary`, `ConcurrentIndex` methods that accept delegates are thread safe. However it does lack may of `ConcurrentDictionary` features like `Count` and `Remove`.
+* **`ConcurrentIndex`** - A thread safe dictionary. Unlike `ConcurrentDictionary`, `ConcurrentIndex` methods that accept delegates are thread safe. However it does lack may of `ConcurrentDictionary`s features like `Count` and `Remove`.
 
 * **`QueueingConcurrent<T>`** - Makes an object thread safe by queing code that modify it.
 
