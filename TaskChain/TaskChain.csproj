@@ -3,6 +3,15 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <AssemblyName>Prototypist.TaskChain</AssemblyName>
+    <Product>Prototypist.TaskChain</Product>
+    <Description>Function Flow is a library that takes a set of algorithms and wires them together in to a single composite algorithm.</Description>
+    <PackageId>Prototypist.TaskChain</PackageId>
+    <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
+    <PackageReleaseNotes>Initial release</PackageReleaseNotes>
+    <Version>1.0.0</Version>
+    <PackageRequireLicenseAcceptance>False</PackageRequireLicenseAcceptance>
+    <Company>Prototypist.TaskChain</Company>
+    <Authors>Prototypist.TaskChain</Authors>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
