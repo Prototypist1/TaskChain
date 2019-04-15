@@ -76,7 +76,7 @@ namespace Prototypist.TaskChain
                 }
                 for (int i = 0; i < outerStep; i++)
                 {
-                    replace[backing.Length + 1] = new TValue[innerSize];
+                    replace[backingCache.Length + i] = new TValue[innerSize];
                 }
                 do
                 {
