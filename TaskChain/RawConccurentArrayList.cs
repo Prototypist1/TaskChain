@@ -9,11 +9,17 @@ namespace Prototypist.TaskChain
     public class RawConcurrentArrayList<TValue> : IReadOnlyList<TValue>
         where TValue : class
     {
-        private volatile TValue[][] backing = new TValue[5][];
+        private volatile TValue[][] backing = new TValue[outerStep][] {
+            new TValue[innerSize],
+            new TValue[innerSize],
+            new TValue[innerSize],
+            new TValue[innerSize],
+            new TValue[innerSize]
+        };
         private int leadingCount = -1;
         private int lastCount = 0;
-        private readonly int innerSize = 20;
-        private readonly int outerStep = 5;
+        private const int innerSize = 20;
+        private const int outerStep = 5;
 
         public int Count
         {
@@ -60,7 +66,6 @@ namespace Prototypist.TaskChain
             var myIndex = Interlocked.Increment(ref leadingCount);
             var myOuterIndex = myIndex / innerSize;
             var myInnerIndex = myIndex % innerSize;
-            
             if (backing.Length <= myOuterIndex)
             {
                 var backingCache = backing;
@@ -69,12 +74,15 @@ namespace Prototypist.TaskChain
                 {
                     replace[i] = backing[i];
                 }
+                for (int i = 0; i < outerStep; i++)
+                {
+                    replace[backing.Length + 1] = new TValue[innerSize];
+                }
                 do
                 {
                     backingCache = Interlocked.CompareExchange(ref backing, replace, backingCache);
                 } while (backingCache.Length <= myOuterIndex);
             }
-            Interlocked.CompareExchange(ref backing[myOuterIndex], new TValue[innerSize], null);
             backing[myOuterIndex][myInnerIndex] = value;
             Interlocked.CompareExchange(ref lastCount, myIndex + 1, myIndex);
         }
