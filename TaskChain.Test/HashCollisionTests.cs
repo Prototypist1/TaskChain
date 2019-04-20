@@ -57,6 +57,5 @@ namespace TaskChain.Test
             Assert.True(target.TryGet(new HashTestHelper(1, 6), out var res6));
             Assert.Equal(6, res6);
         }
-
     }
 }

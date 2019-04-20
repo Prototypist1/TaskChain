@@ -20,7 +20,7 @@ namespace Prototypist.TaskChain
                 this.key = key;
                 this.value = value;
                 this.hash = key.GetHashCode();
-                this.next = new KeyValue[2];
+                this.next = new KeyValue[4];
             }
 
             public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
@@ -39,6 +39,20 @@ namespace Prototypist.TaskChain
                         yield return item;
                     }
                 }
+                if (next[2] != null)
+                {
+                    foreach (var item in next[2])
+                    {
+                        yield return item;
+                    }
+                }
+                if (next[3] != null)
+                {
+                    foreach (var item in next[3])
+                    {
+                        yield return item;
+                    }
+                }
 
             }
 
@@ -46,8 +60,7 @@ namespace Prototypist.TaskChain
         }
 
         private volatile int count;
-        private int GrowSize = 2* Size;
-        private const int HashLength = 7;
+        private const int HashLength = 10;
         private const int Size = 0b1 << HashLength;
         private readonly KeyValue[] tree = new KeyValue[Size];
 
@@ -71,7 +84,8 @@ namespace Prototypist.TaskChain
                 {
                     return true;
                 }
-                ata = ata.next[(hash >> ++atInHash) & 0b1];
+                atInHash += 2;
+                ata = ata.next[(hash >> atInHash) & 0b11];
             }
             return false;
         }
@@ -88,14 +102,10 @@ namespace Prototypist.TaskChain
                 {
                     return at;
                 }
-                at = at.next[(hash >> ++atInHash) & 0b1];
+                atInHash += 2;
+                at = at.next[(hash >> atInHash) & 0b11];
             }
         }
-
-        // TODO you are here
-        // we don't have add or throw??
-        // we don't have set??
-        // we should expand the index
 
         public KeyValue GetOrAdd(KeyValue node)
         {
@@ -115,7 +125,8 @@ namespace Prototypist.TaskChain
                 {
                     return at;
                 }
-                var bit = (hash >> ++atInHash) & 0b1;
+                atInHash += 2;
+                var bit = (hash >> atInHash) & 0b11;
                 if (at.next[bit] == null && Interlocked.CompareExchange(ref at.next[bit], node, null) == null)
                 {
                     Interlocked.Increment(ref count);
@@ -143,7 +154,8 @@ namespace Prototypist.TaskChain
                     res = at;
                     return true;
                 }
-                at = at.next[(hash >> ++atInHash) & 0b1];
+                atInHash += 2;
+                at = at.next[(hash >> atInHash) & 0b11];
             }
         }
 
@@ -165,7 +177,8 @@ namespace Prototypist.TaskChain
                     value = at.value;
                     return true;
                 }
-                at = at.next[(hash >> ++atInHash) & 0b1];
+                atInHash += 2;
+                at = at.next[(hash >> atInHash) & 0b11];
             }
         }
 

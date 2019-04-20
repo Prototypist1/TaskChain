@@ -13,13 +13,16 @@ namespace Prototypist.TaskChain.Benchmark
     {
 
         private RawConcurrentIndexed<HashTest2, string> mine;
+        private RawConcurrentGrowingIndex<HashTest2, string> growingIndexed;
         private ConcurrentDictionary<HashTest2, string> concurrentDictionary;
+        private Dictionary<HashTest2, string> dictionary;
+        private RawConcurrentIndexedTree<HashTest2, string> tree;
         private Random random;
         private HashTest2[] HashItems;
 
-        [Params(1,20,500)]
+        [Params(500)]
         public int Items;
-        [Params(1,6,12)]
+        [Params(1)]
         public int Threads;
 
         [GlobalSetup]
@@ -27,13 +30,19 @@ namespace Prototypist.TaskChain.Benchmark
         {
             random = new Random((int)DateTime.Now.Ticks);
             mine = new RawConcurrentIndexed<HashTest2, string>();
+            growingIndexed = new RawConcurrentGrowingIndex<HashTest2, string>();
             concurrentDictionary = new ConcurrentDictionary<HashTest2, string>();
+            dictionary = new Dictionary<HashTest2, string>();
+            tree = new RawConcurrentIndexedTree<HashTest2, string>();
             for (var x = 1; x <= Items; x++)
             {
                 for (var y = 1; y <= Items; y++)
                 {
                     mine.GetOrAdd(new RawConcurrentIndexed<HashTest2, string>.KeyValue( new HashTest2(x, y), x + ", " + y));
                     concurrentDictionary.GetOrAdd(new HashTest2(x, y), x + ", " + y);
+                    growingIndexed.GetOrAdd(new HashTest2(x, y), x + ", " + y);
+                    dictionary[new HashTest2(x, y)] = x + ", " + y;
+                    tree.GetOrAdd(new HashTest2(x, y), x + ", " + y);
                 }
             }
 
@@ -44,7 +53,27 @@ namespace Prototypist.TaskChain.Benchmark
             }
         }
 
-        [Benchmark]
+        //[Benchmark]
+        public void Simple()
+        {
+            void read()
+            {
+                foreach (var item in HashItems)
+                {
+                    dictionary.TryGetValue(item, out var _);
+                }
+            }
+
+            var actions = new List<Action>();
+            for (var i = 0; i < Threads; i++)
+            {
+                actions.Add(read);
+            }
+
+            Parallel.Invoke(actions.ToArray());
+        }
+
+        //[Benchmark]
         public void Mine()
         {
             void read()
@@ -64,7 +93,47 @@ namespace Prototypist.TaskChain.Benchmark
             Parallel.Invoke(actions.ToArray());
         }
 
+        //[Benchmark]
+        public void RawConcurrentGrowingIndex()
+        {
+            void read()
+            {
+                foreach (var item in HashItems)
+                {
+                    growingIndexed.TryGetValue(item, out var _);
+                }
+            }
+
+            var actions = new List<Action>();
+            for (var i = 0; i < Threads; i++)
+            {
+                actions.Add(read);
+            }
+
+            Parallel.Invoke(actions.ToArray());
+        }
+
         [Benchmark]
+        public void Tree()
+        {
+            void read()
+            {
+                foreach (var item in HashItems)
+                {
+                    tree.TryGetValue(item, out var _);
+                }
+            }
+
+            var actions = new List<Action>();
+            for (var i = 0; i < Threads; i++)
+            {
+                actions.Add(read);
+            }
+
+            Parallel.Invoke(actions.ToArray());
+        }
+
+        //[Benchmark]
         public void ConcurrentDictionary()
         {
             void read()
@@ -211,71 +280,106 @@ namespace Prototypist.TaskChain.Benchmark
     public class WriteAllItems
     {
 
-        private ConcurrentIndexed<HashTest2, string> mine;
-        private ConcurrentDictionary<HashTest2, string> concurrentDictionary;
-        private Random random;
+        private RawConcurrentIndexed<Guid, Guid> origninal;
+        private RawConcurrentGrowingIndex<Guid, Guid> growning;
+        private RawConcurrentIndexedTree<Guid, Guid> tree;
+        private ConcurrentDictionary<Guid, Guid> concurrentDictionary;
 
-        //[Params(1, 50, 100, 300, 500)]
-        [Params(10)]
+        
+        [Params(500)]
         public int Items;
-        //[Params(2, 4, 8)]
-        //public int Threads;
+        [Params(4)]
+        public int Threads;
 
         [GlobalSetup]
         public void Setup()
         {
-            random = new Random((int)DateTime.Now.Ticks);
-            mine = new ConcurrentIndexed<HashTest2, string>();
-            concurrentDictionary = new ConcurrentDictionary<HashTest2, string>();
-            //for (int x = 1; x <= Items; x++)
-            //{
-            //    for (int y = 1; y <= Items; y++)
-            //    {
-            //        mine.GetOrAdd(new HashTest2(x, y), x + ", " + y);
-            //        concurrentDictionary.GetOrAdd(new HashTest2(x, y), x + ", " + y);
-            //    }
-            //}
+            tree = new RawConcurrentIndexedTree<Guid, Guid>();
+            growning = new RawConcurrentGrowingIndex<Guid, Guid>();
+            concurrentDictionary = new ConcurrentDictionary<Guid, Guid>();
+            origninal = new RawConcurrentIndexed<Guid, Guid>();
+        }
+
+        private void AddToOriginal()
+        {
+            for (var i = 0; i < Items; i++)
+            {
+                origninal.GetOrAdd(new RawConcurrentIndexed<Guid, Guid>.KeyValue( Guid.NewGuid(), Guid.NewGuid()));
+            }
+        }
+
+        //[Benchmark]
+        public void Original()
+        {
+            var actions = new List<Action>();
+            for (int i = 0; i < Threads; i++)
+            {
+                actions.Add(AddToOriginal);
+            }
+
+            Parallel.Invoke(actions.ToArray());
+        }
+
+        private void AddToGrowing()
+        {
+            for (var i = 0; i < Items; i++)
+            {
+                growning.GetOrAdd(Guid.NewGuid(), Guid.NewGuid());
+            }
+        }
+
+        //[Benchmark]
+        public void Growing()
+        {
+            var actions = new List<Action>();
+            for (int i = 0; i < Threads; i++)
+            {
+                actions.Add(AddToGrowing);
+            }
+
+            Parallel.Invoke(actions.ToArray());
+
+        }
+
+
+        private void AddToTree() {
+            for (var i = 0; i < Items; i++)
+            {
+                tree.GetOrAdd(Guid.NewGuid(), Guid.NewGuid());
+            }
         }
 
         [Benchmark]
-        public void Mine()
+        public void Tree()
         {
-            //Action read = () =>
-            //{
-            for (var i = 0; i < 100; i++)
+            var actions = new List<Action>();
+            for (int i = 0; i < Threads; i++)
             {
-                mine.Set(new HashTest2(random.Next(1, Items + 1), random.Next(1, Items + 1)), "");
+                actions.Add(AddToTree);
             }
-            //};
 
-            //List<Action> actions = new List<Action>();
-            //for (int i = 0; i < Threads; i++)
-            //{
-            //    actions.Add(read);
-            //}
+            Parallel.Invoke(actions.ToArray());
 
-            //Parallel.Invoke(actions.ToArray());
+        }
 
+        private void AddToConcurrentDictionary()
+        {
+            for (var i = 0; i < Items; i++)
+            {
+                concurrentDictionary.GetOrAdd(Guid.NewGuid(), Guid.NewGuid());
+            }
         }
 
         //[Benchmark]
         public void ConcurrentDictionary()
         {
-            //Action read = () =>
-            //{
-            for (var i = 0; i < 100; i++)
+            var actions = new List<Action>();
+            for (int i = 0; i < Threads; i++)
             {
-                concurrentDictionary[new HashTest2(random.Next(1, Items + 1), random.Next(1, Items + 1))] = "";
+                actions.Add(AddToConcurrentDictionary);
             }
-            //};
 
-            //List<Action> actions = new List<Action>();
-            //for (int i = 0; i < Threads; i++)
-            //{
-            //    actions.Add(read);
-            //}
-
-            //Parallel.Invoke(actions.ToArray());
+            Parallel.Invoke(actions.ToArray());
         }
     }
 }
