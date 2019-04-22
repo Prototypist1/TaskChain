@@ -14,7 +14,7 @@ namespace Prototypist.TaskChain
         {
             public readonly KeyValue[] next;
             public readonly TKey key;
-            public readonly int hash;
+            public readonly uint hash;
             public readonly TValue value;
             public readonly bool dummy;
 
@@ -22,7 +22,7 @@ namespace Prototypist.TaskChain
             {
                 this.key = key;
                 this.value = value;
-                this.hash = key.GetHashCode();
+                this.hash = (uint)key.GetHashCode();
                 this.next = new KeyValue[2];
                 this.dummy = false;
             }
@@ -66,7 +66,7 @@ namespace Prototypist.TaskChain
 
         public RawConcurrentGrowingIndex() {
             HashLength = 7;
-            tree = new KeyValue[0b1 << HashLength];
+            tree = new KeyValue[0b1 << (HashLength-1)];
             for (int i = 0; i < tree.Length; i++)
             {
                 var toAdd = new KeyValue();

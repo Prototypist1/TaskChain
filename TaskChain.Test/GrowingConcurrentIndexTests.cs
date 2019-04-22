@@ -34,5 +34,25 @@ namespace Prototypist.TaskChain.Test
                 Assert.Equal(toAdd, thing[toAdd]);
             }
         }
+
+
+        [Fact]
+        public void GrowingAddAndGetBack()
+        {
+            var thing = new RawConcurrentGrowingIndexedTree<string, string>();
+            var toAdds = new string[1000];
+            for (int i = 0; i < 1000; i++)
+            {
+                toAdds[i] = Guid.NewGuid().ToString();
+            }
+            foreach (var toAdd in toAdds)
+            {
+                thing.GetOrAdd(toAdd, toAdd);
+            }
+            foreach (var toAdd in toAdds)
+            {
+                Assert.Equal(toAdd, thing[toAdd]);
+            }
+        }
     }
 }

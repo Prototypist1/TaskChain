@@ -61,7 +61,7 @@ namespace Prototypist.TaskChain
 
         private volatile int count;
         private const int HashLength = 10;
-        private const int Size = 0b1 << HashLength;
+        private const int Size = 0b1 << (HashLength-1);
         private readonly KeyValue[] tree = new KeyValue[Size];
 
         public int Count {

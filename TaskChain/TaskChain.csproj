@@ -4,7 +4,7 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <AssemblyName>Prototypist.TaskChain</AssemblyName>
     <Product>Prototypist.TaskChain</Product>
-    <Description>Function Flow is a library that takes a set of algorithms and wires them together in to a single composite algorithm.</Description>
+    <Description>Task Chain is a set of lockless thread safe data structures</Description>
     <PackageId>Prototypist.TaskChain</PackageId>
     <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
     <PackageReleaseNotes>Initial release</PackageReleaseNotes>
@@ -16,10 +16,17 @@
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <LangVersion>latest</LangVersion>
+    <Optimize>true</Optimize>
+    <DefineConstants>TRACE</DefineConstants>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Memory" Version="4.5.2" />
+  </ItemGroup>
 
 </Project>

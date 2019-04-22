@@ -6,19 +6,23 @@ namespace Prototypist.TaskChain
 {
     public class RawConcurrentIndexedTree<TKey, TValue> : IReadOnlyDictionary<TKey, TValue>
     {
+        // think about nodes owning width
+        // auto resizing
+        // having sizing based on level:
+        // top index is other indexes are smaller
         private class KeyValue : IEnumerable<KeyValuePair<TKey, TValue>>
         {
             public readonly KeyValue[] next;
             public readonly TKey key;
-            public readonly int hash;
+            public readonly uint hash;
             public readonly TValue value;
 
-            public KeyValue(TKey key, TValue value, int hash)
+            public KeyValue(TKey key, TValue value, uint hash)
             {
                 this.key = key;
                 this.value = value;
                 this.hash = hash;
-                this.next = new KeyValue[0b1<< width];
+                this.next = new KeyValue[size];
             }
 
             public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
@@ -39,8 +43,9 @@ namespace Prototypist.TaskChain
             IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
         }
 
-        private const int width= 4;
-        private const int mask = 0b0000_0000_1111;
+        private const int size = 8;
+        private const int width= 3;
+        private const int mask = 0b_0000_0000_0111;
         private volatile int count;
 
         public int Count
@@ -58,7 +63,7 @@ namespace Prototypist.TaskChain
         public bool ContainsKey(TKey key)
         {
             var at = root;
-            var hash = key.GetHashCode();
+            var hash = (uint)key.GetHashCode();
             var hashKey = hash;
 
             while(true)
@@ -78,7 +83,7 @@ namespace Prototypist.TaskChain
         public TValue GetOrThrow(TKey key)
         {
             var at = root;
-            var hash = key.GetHashCode();
+            var hash = (uint)key.GetHashCode();
             var hashKey = hash;
 
             while (true)
@@ -94,11 +99,22 @@ namespace Prototypist.TaskChain
 
         public TValue GetOrAdd(TKey key,TValue value)
         {
-            var hash = key.GetHashCode();
+            var hash = (uint)key.GetHashCode();
             var hashKey = hash;
-            var node = new KeyValue(key, value, hash);
 
             var at = root;
+
+            // if it is just a get we want to avoid allocation
+            while (at.next[hashKey & mask] is KeyValue next) {
+                at = next;
+                hashKey >>= width;
+                if (hash == at.hash && key.Equals(at.key))
+                {
+                    return at.value;
+                }
+            }
+
+            var node = new KeyValue(key, value, hash);
 
             while (true)
             {
@@ -118,7 +134,7 @@ namespace Prototypist.TaskChain
         public bool TryGetValue(TKey key, out TValue res)
         {
             var at = root;
-            var hash = key.GetHashCode();
+            var hash = (uint)key.GetHashCode();
             var hashKey = hash;
 
             while (true)
