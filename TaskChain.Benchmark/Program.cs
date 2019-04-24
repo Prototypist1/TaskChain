@@ -21,14 +21,17 @@ namespace Prototypist.TaskChain.Benchmark
             //var summary = BenchmarkRunner.Run<InterlockedTest>();
 
 
-            Console.WriteLine("Tree read      " + BenchmarkTreeRead(AcountCount, Range, Runs, WarmUpRuns));
-            Console.WriteLine("Classics read  " + BenchmarkClassicRead(AcountCount, Range, Runs, WarmUpRuns));
-            Console.WriteLine("Tree write     " + BenchmarkTreeWrite(AcountCount, Range, Runs, WarmUpRuns));
-            Console.WriteLine("Classics write " + BenchmarkClassicWrite(AcountCount, Range, Runs, WarmUpRuns));
-            Console.WriteLine("Tree           " + BenchmarkTree(AcountCount, Range, Runs, WarmUpRuns));
-            Console.WriteLine("Classics       " + BenchmarkClassic(AcountCount, Range, Runs, WarmUpRuns));
-            Console.WriteLine("Mine           " + BenchmarkMine(AcountCount, Range, Runs, WarmUpRuns));
-            Console.WriteLine("Growing        " + BenchmarkGrowing(AcountCount, Range, Runs, WarmUpRuns));
+            Console.WriteLine("Growing tree read  " + BenchmarkGrowingTreeRead(AcountCount, Range, Runs, WarmUpRuns));
+            Console.WriteLine("Tree read          " + BenchmarkTreeRead(AcountCount, Range, Runs, WarmUpRuns));
+            Console.WriteLine("Classics read      " + BenchmarkClassicRead(AcountCount, Range, Runs, WarmUpRuns));
+            Console.WriteLine("growing Tree write " + BenchmarkGrowingTreeWrite(AcountCount, Range, Runs, WarmUpRuns));
+            Console.WriteLine("Tree write         " + BenchmarkTreeWrite(AcountCount, Range, Runs, WarmUpRuns));
+            Console.WriteLine("Classics write     " + BenchmarkClassicWrite(AcountCount, Range, Runs, WarmUpRuns));
+            Console.WriteLine("Growing Tree       " + BenchmarkGrowingTree(AcountCount, Range, Runs, WarmUpRuns));
+            Console.WriteLine("Tree               " + BenchmarkTree(AcountCount, Range, Runs, WarmUpRuns));
+            Console.WriteLine("Classics           " + BenchmarkClassic(AcountCount, Range, Runs, WarmUpRuns));
+            //Console.WriteLine("Mine               " + BenchmarkMine(AcountCount, Range, Runs, WarmUpRuns));
+            //Console.WriteLine("Growing            " + BenchmarkGrowing(AcountCount, Range, Runs, WarmUpRuns));
             //Console.ReadLine();
         }
 
@@ -116,6 +119,47 @@ namespace Prototypist.TaskChain.Benchmark
             return MyStupidBenchmarker.Benchmark(stepUp, run, runs, warmUpRuns).ToString();
 
         }
+        static string BenchmarkGrowingTree(int acountCount, int range, int runs, int warmUpRuns)
+        {
+            var rand = new Random();
+
+            var tree = new RawConcurrentGrowingIndexedTree<int, int>();
+
+            List<Action> actions = null;
+
+            Action stepUp = () =>
+            {
+                actions = new List<Action>();
+                for (int i = 0; i < acountCount; i++)
+                {
+                    var roll = rand.Next(2);
+                    if (roll == 0)
+                    {
+                        var number = rand.Next(range);
+                        actions.Add(() =>
+                        {
+                            tree.GetOrAdd(number, number);
+                        });
+                    }
+                    else if (roll == 1)
+                    {
+                        var number = rand.Next(range);
+                        actions.Add(() =>
+                        {
+                            tree.TryGetValue(number, out var _);
+                        });
+                    }
+                }
+            };
+
+            Action run = () =>
+            {
+                Parallel.Invoke(actions.ToArray());
+            };
+
+            return MyStupidBenchmarker.Benchmark(stepUp, run, runs, warmUpRuns).ToString();
+
+        }
 
         static string BenchmarkTree(int acountCount,  int range, int runs, int warmUpRuns) {
             var rand = new Random();
@@ -139,6 +183,42 @@ namespace Prototypist.TaskChain.Benchmark
                         });
                     }
                     else if (roll == 1)
+                    {
+                        var number = rand.Next(range);
+                        actions.Add(() =>
+                        {
+                            tree.TryGetValue(number, out var _);
+                        });
+                    }
+                }
+            };
+
+            Action run = () =>
+            {
+                Parallel.Invoke(actions.ToArray());
+            };
+
+            return MyStupidBenchmarker.Benchmark(stepUp, run, runs, warmUpRuns).ToString();
+
+        }
+
+        static string BenchmarkGrowingTreeRead(int acountCount, int range, int runs, int warmUpRuns)
+        {
+            var rand = new Random();
+
+            var tree = new RawConcurrentGrowingIndexedTree<int, int>();
+
+            List<Action> actions = null;
+
+            Action stepUp = () =>
+            {
+                actions = new List<Action>();
+                for (int i = 0; i < acountCount; i++)
+                {
+                    {
+                        var number = rand.Next(range);
+                        tree.GetOrAdd(number, number);
+                    }
                     {
                         var number = rand.Next(range);
                         actions.Add(() =>
@@ -193,6 +273,36 @@ namespace Prototypist.TaskChain.Benchmark
             return MyStupidBenchmarker.Benchmark(stepUp, run, runs, warmUpRuns).ToString();
 
         }
+
+        static string BenchmarkGrowingTreeWrite(int acountCount, int range, int runs, int warmUpRuns)
+        {
+            var rand = new Random();
+
+            var tree = new RawConcurrentGrowingIndexedTree<int, int>();
+
+            List<Action> actions = null;
+
+            Action stepUp = () =>
+            {
+                actions = new List<Action>();
+                for (int i = 0; i < acountCount; i++)
+                {
+                    var number = rand.Next(range);
+                    actions.Add(() =>
+                    {
+                        tree.GetOrAdd(number, number);
+                    });
+                }
+            };
+
+            Action run = () =>
+            {
+                Parallel.Invoke(actions.ToArray());
+            };
+
+            return MyStupidBenchmarker.Benchmark(stepUp, run, runs, warmUpRuns).ToString();
+        }
+
 
         static string BenchmarkTreeWrite(int acountCount, int range, int runs, int warmUpRuns)
         {

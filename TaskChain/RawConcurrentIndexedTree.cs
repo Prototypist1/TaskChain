@@ -119,12 +119,14 @@ namespace Prototypist.TaskChain
             while (true)
             {
                 at = Interlocked.CompareExchange(ref at.next[hashKey & mask], node, null);
-                if ((at == null) || (hash == at.hash && key.Equals(at.key))) {
-                    if (at == null)
-                    {
-                        Interlocked.Increment(ref count);
-                        return node.value;
-                    }
+                if (at == null)
+                {
+                    Interlocked.Increment(ref count);
+                    return node.value;
+                }
+
+                if (hash == at.hash && key.Equals(at.key)) {
+                   
                     return at.value;
                 }
                 hashKey >>= width;
@@ -140,13 +142,15 @@ namespace Prototypist.TaskChain
             while (true)
             {
                 at = at.next[hashKey & mask];
-                if ((at == null) || (hash == at.hash && key.Equals(at.key)))
+                if (at == null)
                 {
-                    if (at == null)
-                    {
-                        res = default;
-                        return false;
-                    }
+                    res = default;
+                    return false;
+                }
+
+                if (hash == at.hash && key.Equals(at.key))
+                {
+
                     res = at.value;
                     return true;
                 }

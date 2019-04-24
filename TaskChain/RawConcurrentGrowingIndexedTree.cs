@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Prototypist.TaskChain
 {
@@ -20,7 +21,6 @@ namespace Prototypist.TaskChain
             public readonly TValue value;
             public readonly bool dummy;
             public readonly int sizeInBits;
-            private int resize = 0;
 
             public KeyValue(TKey key, TValue value, int hash)
             {
@@ -44,6 +44,7 @@ namespace Prototypist.TaskChain
 
             public KeyValue(int hash, KeyValue[] next, int sizeInBits)
             {
+                this.hash = hash;
                 this.sizeInBits = sizeInBits;
                 this.next = next;
                 this.dummy = true;
@@ -67,77 +68,131 @@ namespace Prototypist.TaskChain
 
             IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-            private bool Resize(int startingHashPosition,out KeyValue result)
+            // we only resize when all our childrne exist
+            // we only resize if none of the children are dummies
+            // we only resize when all our children are the same size
+            
+            public KeyValue Resize(int startingHashPosition,int addedWidth)
             {
+                // allocat new array
+                var newArray = new KeyValue[1 << (sizeInBits + addedWidth)];
 
-                // 'lock' the item we are resizing
-                // we never unlock it, don't want it to be resized again
-                if (Interlocked.CompareExchange(ref resize,1,0)==0) {
+                // create the new KeyValue
+                var result = new KeyValue(this.key, this.value, this.hash, newArray, sizeInBits + addedWidth);
 
-                    // allocat new array
-                    var newArray = new KeyValue[1 << (this.sizeInBits + 1)];
-
-                    // create the new KeyValue
-                    result = new KeyValue(this.key, this.value, this.hash, newArray, this.sizeInBits + 1);
-
-                    // fill the old structure with dummies
-                    this.FillWithDummies(startingHashPosition);
-
-                    // re insert the whole structure
-                    this.InsertAll(startingHashPosition, result);
-
-                    return true;
-                }
-                result = default;
-                return false;
-
-            }
-
-            private void FillWithDummies(int startingHashPosition)
-            {
+                // fill the old structure with dummies
                 for (int i = 0; i < next.Length; i++)
                 {
-                    var child = Interlocked.CompareExchange(ref next[i], new KeyValue((this.hash & ~((1 << (32 - startingHashPosition)) - 1)) | (i << (32 - startingHashPosition - this.sizeInBits)), new KeyValue[1], 0), null);
-                    if (child != null) {
-                        child.FillWithDummies(startingHashPosition + this.sizeInBits);
-                    }
-                }
-            }
-
-            private void InsertAll(int startingHashPosition, KeyValue insertIn)
-            {
-                for (int i = 0; i < next.Length; i++)
-                {
-                    var toInsert = next[i];
-
-                    if (!(toInsert.dummy && toInsert.next[0] is KeyValue))
+                    var child = next[i];
+                    for (int j = 0; j < child.next.Length; j++)
                     {
-                        ForceAddItem(startingHashPosition, insertIn, toInsert);
+                        Interlocked.CompareExchange(ref child.next[j], new KeyValue((child.hash & ~((1 << (32 - startingHashPosition - this.sizeInBits)) - 1)) | (j << (32 - startingHashPosition - this.sizeInBits - child.sizeInBits)), new KeyValue[1], 0), null);
+                        newArray[(i * child.next.Length) + j] = child.next[j];
                     }
-
-                    toInsert.InsertAll(startingHashPosition, insertIn);
                 }
+
+                // re insert the whole structure
+                for (int i = 0; i < next.Length; i++)
+                {
+                    ForceAddItem(startingHashPosition, result, next[i]);
+                }
+
+                return result;
             }
 
             private void ForceAddItem(int startingHashPosition, KeyValue insertIn, KeyValue toInsert)
             {
+                var node = new KeyValue(toInsert.key, toInsert.value, toInsert.hash);
 
-
-                var node = toInsert.dummy ? toInsert : new KeyValue(toInsert.key, toInsert.value, toInsert.hash);
-
-                var hash = key.GetHashCode();
-                var hashPosition = startingHashPosition;
+                var hash = node.hash;
 
                 var at = insertIn;
+                var hashPosition = startingHashPosition + at.sizeInBits;
 
-                while ((at = Interlocked.CompareExchange(ref at.next[(hash >> (32 - hashPosition - at.sizeInBits)) & ((1 << at.sizeInBits) - 1)], node, null)) is KeyValue)
+                while ((at = Interlocked.CompareExchange(ref at.next[(hash >> (32 - hashPosition)) & ((1 << at.sizeInBits) - 1)], node, null)) is KeyValue)
                 {
                     hashPosition += at.sizeInBits;
                 }
             }
+
+            public bool CanResize(out int addedWidth) {
+                if (dummy)
+                {
+                    addedWidth = default;
+                    return false;
+                }
+
+                for (int i = 0; i < next.Length; i++)
+                {
+                    if (next[i] == null)
+                    {
+                        addedWidth = default;
+                        return false;
+                    }
+                    if (next[i].dummy)
+                    {
+                        addedWidth = default;
+                        return false;
+                    }
+                    if (next[i].sizeInBits != next[0].sizeInBits)
+                    {
+                        addedWidth = default;
+                        return false;
+                    }
+                }
+                addedWidth = next[0].sizeInBits;
+                return true;
+            }
+
+            public void RemoveExpiredDummies()
+            {
+                for (int i = 0; i < next.Length; i++)
+                {
+                    if (next[i] != null)
+                    {
+                        while (next[i].dummy && next[i].next[0] != null)
+                        {
+                            next[i] = next[i].next[0];
+                        }
+                        next[i].RemoveExpiredDummies();
+                    }
+                }
+            }
         }
 
+        private string PlacementDebugger() {
+            var strings = new List<string>();
+            PlacementDebugger(root, new string[0], strings);
+            return string.Join(Environment.NewLine, strings);
+        }
 
+        private void PlacementDebugger(KeyValue target,  string[] indexes, List<string> strings) {
+            if (target == null)
+            {
+                return;
+            }
+
+            if (!IntToString(target.hash, 32).StartsWith(string.Join("", indexes)))
+            {
+                strings.Add(string.Join(", ", indexes) + " : " + IntToString(target.hash, 32) + " " + target.dummy);
+            }
+
+            for (int i = 0; i < target.next.Length; i++)
+            {
+                var nextIndex = indexes.Select(x => x).ToList();
+                nextIndex.Add(IntToString(i, target.sizeInBits));
+                PlacementDebugger(target.next[i], nextIndex.ToArray(), strings);
+            }
+        }
+
+        private static string IntToString(int i,int bits) {
+            var res = "";
+            for (int j = bits - 1; j >= 0; j--)
+            {
+                res += i >> j & 1;
+            }
+            return res;
+        }
 
         private int count = 0;
 
@@ -152,7 +207,7 @@ namespace Prototypist.TaskChain
         public TValue this[TKey key] => GetOrThrow(key);
 
         // probably should be bigger
-        KeyValue root = new KeyValue(default, default, 0,new KeyValue[2],1);
+        KeyValue root = new KeyValue(default, default, 0,new KeyValue[1024],10);
 
         public bool ContainsKey(TKey key)
         {
@@ -163,10 +218,12 @@ namespace Prototypist.TaskChain
             while (true)
             {
                 at = at.next[(hash >> (32-hashPosition-at.sizeInBits)) & ((1 << at.sizeInBits)-1)];
+
                 if (at == null)
                 {
                     return false;
                 }
+
                 if (hash == at.hash && key.Equals(at.key))
                 {
                     return true;
@@ -183,27 +240,29 @@ namespace Prototypist.TaskChain
 
             while (true)
             {
-                at = at.next[(hash >> (32 - hashPosition - at.sizeInBits)) & ((1 << at.sizeInBits) - 1)];
+                hashPosition += at.sizeInBits;
+                at = at.next[(hash >> (32 - hashPosition)) & ((1 << at.sizeInBits) - 1)];
                 if (hash == at.hash && key.Equals(at.key))
                 {
                     return at.value;
                 }
-                hashPosition += at.sizeInBits;
             }
         }
 
         public TValue GetOrAdd(TKey key, TValue value)
         {
             var hash = key.GetHashCode();
-            var hashPosition = 0;
+            
 
             var at = root;
+            var hashPosition = at.sizeInBits;
 
             // if it is just a get we want to avoid allocation
-            while (at.next[(hash >> (32 - hashPosition - at.sizeInBits)) & ((1 << at.sizeInBits) - 1)] is KeyValue next)
+            while (at.next[(hash >> (32 - hashPosition)) & ((1 << at.sizeInBits) - 1)] is KeyValue next)
             {
                 at = next;
                 hashPosition += at.sizeInBits;
+
                 if (hash == at.hash && key.Equals(at.key))
                 {
                     return at.value;
@@ -214,16 +273,23 @@ namespace Prototypist.TaskChain
 
             while (true)
             {
-                at = Interlocked.CompareExchange(ref at.next[(hash >> (32 - hashPosition - at.sizeInBits)) & ((1 << at.sizeInBits) - 1)], node, null);
-                if ((at == null) || (hash == at.hash && key.Equals(at.key)))
+                at = Interlocked.CompareExchange(ref at.next[(hash >> (32 - hashPosition)) & ((1 << at.sizeInBits) - 1)], node, null);
+
+                if (at == null)
                 {
-                    if (at == null)
+                    var counter = Interlocked.Increment(ref count);
+                    if (counter > 1024 && (counter & (counter - 1)) == 0 && Interlocked.CompareExchange(ref cleanUpLock, 1, 0) == 0)
                     {
-                        Interlocked.Increment(ref count);
-                        return node.value;
+                        Task.Run(CleanUp);
                     }
+                    return node.value;
+                }
+
+                if (hash == at.hash && key.Equals(at.key))
+                {
                     return at.value;
                 }
+
                 hashPosition += at.sizeInBits;
             }
         }
@@ -232,24 +298,51 @@ namespace Prototypist.TaskChain
         {
             var at = root;
             var hash = key.GetHashCode();
-            var hashPosition = 0;
+            var hashPosition = at.sizeInBits;
 
             while (true)
             {
-                at = at.next[(hash >> (32 - hashPosition - at.sizeInBits)) & ((1 << at.sizeInBits) - 1)];
-                if ((at == null) || (hash == at.hash && key.Equals(at.key)))
+                at = at.next[(hash >> (32 - hashPosition)) & ((1 << at.sizeInBits) - 1)];
+
+                if (at == null)
                 {
-                    if (at == null)
-                    {
-                        res = default;
-                        return false;
-                    }
+                    res = default;
+                    return false;
+                }
+
+                if ((hash == at.hash && key.Equals(at.key)))
+                {
+
                     res = at.value;
                     return true;
                 }
                 hashPosition += at.sizeInBits;
             }
         }
+
+        private int cleanUpLock = 0;
+        private void CleanUp() {
+            root.RemoveExpiredDummies();
+
+            ConsiderResizing(ref root, 0);
+
+            cleanUpLock = 0;
+        }
+
+        private void ConsiderResizing(ref KeyValue keyValues,int startingHashPosition) {
+            if (keyValues == null) {
+                return;
+            }
+
+            if (keyValues.CanResize(out var addedWidth)) {
+                keyValues = keyValues.Resize(startingHashPosition,addedWidth);
+            }
+            for (int i = 0; i < keyValues.next.Length; i++)
+            {
+                ConsiderResizing(ref keyValues.next[i], startingHashPosition + keyValues.sizeInBits);
+            }
+        }
+
 
         public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
         {
