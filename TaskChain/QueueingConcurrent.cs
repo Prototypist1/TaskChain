@@ -269,19 +269,31 @@ namespace Prototypist.TaskChain
             {
                 if (Interlocked.CompareExchange(ref running, RUNNING, STOPPED) == STOPPED)
                 {
+                    if (startOfChain == null)
+                    {
+                        running = STOPPED;
+                        goto exit;
+                    }
                     value = await startOfChain.Do((TValue)value);
                     startOfChain = startOfChain.next;
                     running = STOPPED;
                     TryProcess();
                 }
+                exit:
                 return await link.taskCompletionSource.Task;
             }
         }
 
         public void TryProcess()
         {
-            if (startOfChain != null && Interlocked.CompareExchange(ref running, RUNNING, STOPPED) == STOPPED)
+            if (Interlocked.CompareExchange(ref running, RUNNING, STOPPED) == STOPPED)
             {
+                if (startOfChain == null)
+                {
+                    running = STOPPED;
+                    return;
+                }
+
                 Task.Run(Process);
             }
 

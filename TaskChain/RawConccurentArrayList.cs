@@ -69,10 +69,10 @@ namespace Prototypist.TaskChain
             if (backing.Length <= myOuterIndex)
             {
                 var backingCache = backing;
-                var replace = new TValue[backing.Length + outerStep][];
-                for (var i = 0; i < backing.Length; i++)
+                var replace = new TValue[backingCache.Length + outerStep][];
+                for (var i = 0; i < backingCache.Length; i++)
                 {
-                    replace[i] = backing[i];
+                    replace[i] = backingCache[i];
                 }
                 for (int i = 0; i < outerStep; i++)
                 {
