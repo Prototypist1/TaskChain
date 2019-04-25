@@ -244,11 +244,17 @@ namespace Prototypist.TaskChain
             {
                 if (Interlocked.CompareExchange(ref running, RUNNING, STOPPED) == STOPPED)
                 {
+                    if (startOfChain == null)
+                    {
+                        running = STOPPED;
+                        goto exit;
+                    }
                     value = startOfChain.Do((TValue)value).Result;
                     startOfChain = startOfChain.next;
                     running = STOPPED;
                     TryProcess();
                 }
+                exit:
                 return link.taskCompletionSource.Task;
             }
         }

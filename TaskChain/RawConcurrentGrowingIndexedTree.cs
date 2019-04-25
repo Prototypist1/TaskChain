@@ -310,12 +310,13 @@ namespace Prototypist.TaskChain
                     return false;
                 }
 
-                if ((hash == at.hash && key.Equals(at.key)))
+                if (hash == at.hash && key.Equals(at.key))
                 {
 
                     res = at.value;
                     return true;
                 }
+
                 hashPosition += at.sizeInBits;
             }
         }
@@ -334,7 +335,7 @@ namespace Prototypist.TaskChain
                 return;
             }
 
-            if (keyValues.CanResize(out var addedWidth)) {
+            while (keyValues.CanResize(out var addedWidth)) {
                 keyValues = keyValues.Resize(startingHashPosition,addedWidth);
             }
             for (int i = 0; i < keyValues.next.Length; i++)
