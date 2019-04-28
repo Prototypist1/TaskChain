@@ -21,15 +21,17 @@ namespace Prototypist.TaskChain
             public readonly TValue value;
             public readonly bool dummy;
             public readonly int sizeInBits;
+            public readonly int mask;
 
             public KeyValue(TKey key, TValue value, int hash)
             {
                 this.key = key;
                 this.value = value;
                 this.hash = hash;
-                this.sizeInBits = 1;
+                this.sizeInBits = 2;
                 this.next = new KeyValue[1<<sizeInBits];
                 this.dummy = false;
+                this.mask = (1 << sizeInBits) - 1;
             }
 
             public KeyValue(TKey key, TValue value, int hash, KeyValue[] next, int sizeInBits)
@@ -40,6 +42,7 @@ namespace Prototypist.TaskChain
                 this.sizeInBits = sizeInBits;
                 this.next = next;
                 this.dummy = false;
+                this.mask = (1 << sizeInBits) - 1;
             }
 
             public KeyValue(int hash, KeyValue[] next, int sizeInBits)
@@ -48,6 +51,7 @@ namespace Prototypist.TaskChain
                 this.sizeInBits = sizeInBits;
                 this.next = next;
                 this.dummy = true;
+                this.mask = (1 << sizeInBits) - 1;
             }
 
             public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
@@ -109,7 +113,7 @@ namespace Prototypist.TaskChain
                 var at = insertIn;
                 var hashPosition = startingHashPosition + at.sizeInBits;
 
-                while ((at = Interlocked.CompareExchange(ref at.next[(hash >> (32 - hashPosition)) & ((1 << at.sizeInBits) - 1)], node, null)) is KeyValue)
+                while ((at = Interlocked.CompareExchange(ref at.next[(hash >> (32 - hashPosition)) & at.mask], node, null)) is KeyValue)
                 {
                     hashPosition += at.sizeInBits;
                 }
@@ -206,8 +210,7 @@ namespace Prototypist.TaskChain
 
         public TValue this[TKey key] => GetOrThrow(key);
 
-        // probably should be bigger
-        KeyValue root = new KeyValue(default, default, 0,new KeyValue[1024],10);
+        KeyValue root = new KeyValue(default, default, 0,new KeyValue[32],5);
 
         public bool ContainsKey(TKey key)
         {
@@ -217,7 +220,7 @@ namespace Prototypist.TaskChain
 
             while (true)
             {
-                at = at.next[(hash >> (32-hashPosition-at.sizeInBits)) & ((1 << at.sizeInBits)-1)];
+                at = at.next[(hash >> (32-hashPosition-at.sizeInBits)) & at.mask];
 
                 if (at == null)
                 {
@@ -241,7 +244,7 @@ namespace Prototypist.TaskChain
             while (true)
             {
                 hashPosition += at.sizeInBits;
-                at = at.next[(hash >> (32 - hashPosition)) & ((1 << at.sizeInBits) - 1)];
+                at = at.next[(hash >> (32 - hashPosition)) & at.mask];
                 if (hash == at.hash && key.Equals(at.key))
                 {
                     return at.value;
@@ -257,8 +260,10 @@ namespace Prototypist.TaskChain
             var at = root;
             var hashPosition = at.sizeInBits;
 
+            var next = at.next[(hash >> (32 - hashPosition)) & at.mask];
+
             // if it is just a get we want to avoid allocation
-            while (at.next[(hash >> (32 - hashPosition)) & ((1 << at.sizeInBits) - 1)] is KeyValue next)
+            while (next != null)
             {
                 at = next;
                 hashPosition += at.sizeInBits;
@@ -267,18 +272,19 @@ namespace Prototypist.TaskChain
                 {
                     return at.value;
                 }
+                next = at.next[(hash >> (32 - hashPosition)) & at.mask];
             }
 
             var node = new KeyValue(key, value, hash);
 
             while (true)
             {
-                at = Interlocked.CompareExchange(ref at.next[(hash >> (32 - hashPosition)) & ((1 << at.sizeInBits) - 1)], node, null);
+                at = Interlocked.CompareExchange(ref at.next[(hash >> (32 - hashPosition)) & at.mask], node, null);
 
                 if (at == null)
                 {
                     var counter = Interlocked.Increment(ref count);
-                    if (counter > 1024 && (counter & (counter - 1)) == 0 && Interlocked.CompareExchange(ref cleanUpLock, 1, 0) == 0)
+                    if ((counter & 1024) == 1024 && Interlocked.CompareExchange(ref cleanUpLock, 1, 0) == 0)
                     {
                         Task.Run(CleanUp);
                     }
@@ -302,7 +308,7 @@ namespace Prototypist.TaskChain
 
             while (true)
             {
-                at = at.next[(hash >> (32 - hashPosition)) & ((1 << at.sizeInBits) - 1)];
+                at = at.next[(hash >> (32 - hashPosition)) & at.mask];
 
                 if (at == null)
                 {

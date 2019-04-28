@@ -2,16 +2,18 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Prototypist.TaskChain.Benchmark
 {
     class Program
     {
-        private const int AcountCount = 100000;
-        private const int Range = 1000;
-        private const int Runs = 100;
-        private const int WarmUpRuns = 10;
+        private const int AcountCount = 1000000;
+        private const int Range = 100000;
+        private const int Runs = 50;
+        private const int WarmUpRuns = 5;
 
         static void Main(string[] _)
         {
@@ -20,16 +22,21 @@ namespace Prototypist.TaskChain.Benchmark
             //var summary = BenchmarkRunner.Run<ParallelUpdate>();
             //var summary = BenchmarkRunner.Run<InterlockedTest>();
 
+            Console.WriteLine("Classics read 100         " + BenchmarkGrowingTreeRead(100, Runs, WarmUpRuns));
+            Console.WriteLine("Classics read 1000        " + BenchmarkGrowingTreeRead(1000, Runs, WarmUpRuns));
+            Console.WriteLine("Classics read 10000       " + BenchmarkGrowingTreeRead(10000, Runs, WarmUpRuns));
+            Console.WriteLine("Classics read 100000      " + BenchmarkGrowingTreeRead(100000, Runs, WarmUpRuns));
+            Console.WriteLine("Classics read 1000000     " + BenchmarkGrowingTreeRead(1000000, Runs, WarmUpRuns));
 
-            Console.WriteLine("Growing tree read  " + BenchmarkGrowingTreeRead(AcountCount, Range, Runs, WarmUpRuns));
-            Console.WriteLine("Tree read          " + BenchmarkTreeRead(AcountCount, Range, Runs, WarmUpRuns));
-            Console.WriteLine("Classics read      " + BenchmarkClassicRead(AcountCount, Range, Runs, WarmUpRuns));
-            Console.WriteLine("growing Tree write " + BenchmarkGrowingTreeWrite(AcountCount, Range, Runs, WarmUpRuns));
-            Console.WriteLine("Tree write         " + BenchmarkTreeWrite(AcountCount, Range, Runs, WarmUpRuns));
-            Console.WriteLine("Classics write     " + BenchmarkClassicWrite(AcountCount, Range, Runs, WarmUpRuns));
-            Console.WriteLine("Growing Tree       " + BenchmarkGrowingTree(AcountCount, Range, Runs, WarmUpRuns));
-            Console.WriteLine("Tree               " + BenchmarkTree(AcountCount, Range, Runs, WarmUpRuns));
-            Console.WriteLine("Classics           " + BenchmarkClassic(AcountCount, Range, Runs, WarmUpRuns));
+            //Console.WriteLine("Growing tree read  " + BenchmarkGrowingTreeRead(AcountCount, Runs, WarmUpRuns));
+            //Console.WriteLine("Tree read          " + BenchmarkTreeRead(AcountCount, Runs, WarmUpRuns));
+            //Console.WriteLine("Classics read      " + BenchmarkClassicRead(AcountCount, Runs, WarmUpRuns));
+            //Console.WriteLine("growing Tree write " + BenchmarkGrowingTreeWrite(AcountCount, Range, Runs, WarmUpRuns));
+            //Console.WriteLine("Tree write         " + BenchmarkTreeWrite(AcountCount, Range, Runs, WarmUpRuns));
+            //Console.WriteLine("Classics write     " + BenchmarkClassicWrite(AcountCount, Range, Runs, WarmUpRuns));
+            //Console.WriteLine("Growing Tree       " + BenchmarkGrowingTree(AcountCount, Range, Runs, WarmUpRuns));
+            //Console.WriteLine("Tree               " + BenchmarkTree(AcountCount, Range, Runs, WarmUpRuns));
+            //Console.WriteLine("Classics           " + BenchmarkClassic(AcountCount, Range, Runs, WarmUpRuns));
             //Console.WriteLine("Mine               " + BenchmarkMine(AcountCount, Range, Runs, WarmUpRuns));
             //Console.WriteLine("Growing            " + BenchmarkGrowing(AcountCount, Range, Runs, WarmUpRuns));
             //Console.ReadLine();
@@ -40,12 +47,12 @@ namespace Prototypist.TaskChain.Benchmark
         {
             var rand = new Random();
 
-            var tree = new RawConcurrentIndexed<int, int>();
 
             List<Action> actions = null; ;
 
             Action stepUp = () =>
             {
+                var tree = new RawConcurrentIndexed<int, int>();
                 actions = new List<Action>();
                 for (int i = 0; i < acountCount; i++)
                 {
@@ -55,7 +62,7 @@ namespace Prototypist.TaskChain.Benchmark
                         var number = rand.Next(range);
                         actions.Add(() =>
                         {
-                            tree.GetOrAdd(new RawConcurrentIndexed<int, int>.KeyValue( number, number));
+                            tree.GetOrAdd(new RawConcurrentIndexed<int, int>.KeyValue(number, number));
                         });
                     }
                     else if (roll == 1)
@@ -82,12 +89,12 @@ namespace Prototypist.TaskChain.Benchmark
         {
             var rand = new Random();
 
-            var tree = new RawConcurrentGrowingIndex<int, int>();
 
-            List<Action> actions = null;;
+            List<Action> actions = null; ;
 
             Action stepUp = () =>
             {
+                var tree = new RawConcurrentGrowingIndex<int, int>();
                 actions = new List<Action>();
                 for (int i = 0; i < acountCount; i++)
                 {
@@ -123,12 +130,12 @@ namespace Prototypist.TaskChain.Benchmark
         {
             var rand = new Random();
 
-            var tree = new RawConcurrentGrowingIndexedTree<int, int>();
 
             List<Action> actions = null;
 
             Action stepUp = () =>
             {
+                var tree = new RawConcurrentGrowingIndexedTree<int, int>();
                 actions = new List<Action>();
                 for (int i = 0; i < acountCount; i++)
                 {
@@ -161,15 +168,15 @@ namespace Prototypist.TaskChain.Benchmark
 
         }
 
-        static string BenchmarkTree(int acountCount,  int range, int runs, int warmUpRuns) {
+        static string BenchmarkTree(int acountCount, int range, int runs, int warmUpRuns)
+        {
             var rand = new Random();
-
-            var tree = new RawConcurrentIndexedTree<int, int>();
 
             List<Action> actions = null;
 
             Action stepUp = () =>
             {
+                var tree = new RawConcurrentIndexedTree<int, int>();
                 actions = new List<Action>();
                 for (int i = 0; i < acountCount; i++)
                 {
@@ -202,30 +209,28 @@ namespace Prototypist.TaskChain.Benchmark
 
         }
 
-        static string BenchmarkGrowingTreeRead(int acountCount, int range, int runs, int warmUpRuns)
+        static string BenchmarkGrowingTreeRead(int acountCount, int runs, int warmUpRuns)
         {
             var rand = new Random();
 
-            var tree = new RawConcurrentGrowingIndexedTree<int, int>();
 
             List<Action> actions = null;
 
             Action stepUp = () =>
             {
+                var tree = new RawConcurrentGrowingIndexedTree<Guid, string>();
                 actions = new List<Action>();
                 for (int i = 0; i < acountCount; i++)
                 {
+
+                    var guid = Guid.NewGuid();
+                    tree.GetOrAdd(guid, guid.ToString());
+
+                    actions.Add(() =>
                     {
-                        var number = rand.Next(range);
-                        tree.GetOrAdd(number, number);
-                    }
-                    {
-                        var number = rand.Next(range);
-                        actions.Add(() =>
-                        {
-                            tree.TryGetValue(number, out var _);
-                        });
-                    }
+                        tree.TryGetValue(guid, out var _);
+                    });
+
                 }
             };
 
@@ -238,30 +243,28 @@ namespace Prototypist.TaskChain.Benchmark
 
         }
 
-        static string BenchmarkTreeRead(int acountCount, int range, int runs, int warmUpRuns)
+        static string BenchmarkTreeRead(int acountCount, int runs, int warmUpRuns)
         {
             var rand = new Random();
 
-            var tree = new RawConcurrentIndexedTree<int, int>();
 
             List<Action> actions = null;
 
             Action stepUp = () =>
             {
+                var tree = new RawConcurrentIndexedTree<Guid, string>();
                 actions = new List<Action>();
                 for (int i = 0; i < acountCount; i++)
                 {
+
+                    var guid = Guid.NewGuid();
+                    tree.GetOrAdd(guid, guid.ToString());
+
+                    actions.Add(() =>
                     {
-                        var number = rand.Next(range);
-                        tree.GetOrAdd(number, number);
-                    }
-                    {
-                        var number = rand.Next(range);
-                        actions.Add(() =>
-                        {
-                            tree.TryGetValue(number, out var _);
-                        });
-                    }
+                        tree.TryGetValue(guid, out var _);
+                    });
+
                 }
             };
 
@@ -278,12 +281,12 @@ namespace Prototypist.TaskChain.Benchmark
         {
             var rand = new Random();
 
-            var tree = new RawConcurrentGrowingIndexedTree<int, int>();
 
             List<Action> actions = null;
 
             Action stepUp = () =>
             {
+                var tree = new RawConcurrentGrowingIndexedTree<int, int>();
                 actions = new List<Action>();
                 for (int i = 0; i < acountCount; i++)
                 {
@@ -298,6 +301,7 @@ namespace Prototypist.TaskChain.Benchmark
             Action run = () =>
             {
                 Parallel.Invoke(actions.ToArray());
+
             };
 
             return MyStupidBenchmarker.Benchmark(stepUp, run, runs, warmUpRuns).ToString();
@@ -308,12 +312,12 @@ namespace Prototypist.TaskChain.Benchmark
         {
             var rand = new Random();
 
-            var tree = new RawConcurrentIndexedTree<int, int>();
 
             List<Action> actions = null;
 
             Action stepUp = () =>
             {
+                var tree = new RawConcurrentIndexedTree<int, int>();
                 actions = new List<Action>();
                 for (int i = 0; i < acountCount; i++)
                 {
@@ -334,30 +338,28 @@ namespace Prototypist.TaskChain.Benchmark
         }
 
 
-        static string BenchmarkClassicRead(int acountCount, int range, int runs, int warmUpRuns)
+        static string BenchmarkClassicRead(int acountCount, int runs, int warmUpRuns)
         {
             var rand = new Random();
 
-            var tree = new ConcurrentDictionary<int, int>();
 
             var actions = new List<Action>();
 
             Action stepUp = () =>
             {
+                var tree = new ConcurrentDictionary<Guid, string>();
                 actions = new List<Action>();
                 for (int i = 0; i < acountCount; i++)
                 {
+
+                    var guid = Guid.NewGuid();
+                    tree.GetOrAdd(guid, guid.ToString());
+
+                    actions.Add(() =>
                     {
-                        var number = rand.Next(range);
-                        tree.GetOrAdd(number, number);
-                    }
-                    {
-                        var number = rand.Next(range);
-                        actions.Add(() =>
-                        {
-                            tree.TryGetValue(number, out var _);
-                        });
-                    }
+                        tree.TryGetValue(guid, out var _);
+                    });
+
                 }
             };
 
@@ -374,12 +376,12 @@ namespace Prototypist.TaskChain.Benchmark
         {
             var rand = new Random();
 
-            var tree = new ConcurrentDictionary<int, int>();
 
             var actions = new List<Action>();
 
             Action stepUp = () =>
             {
+                var tree = new ConcurrentDictionary<int, int>();
                 actions = new List<Action>();
                 for (int i = 0; i < acountCount; i++)
                 {
@@ -404,12 +406,12 @@ namespace Prototypist.TaskChain.Benchmark
         {
             var rand = new Random();
 
-            var tree = new ConcurrentDictionary<int, int>();
 
             var actions = new List<Action>();
 
             Action stepUp = () =>
             {
+                var tree = new ConcurrentDictionary<int, int>();
                 actions = new List<Action>();
                 for (int i = 0; i < acountCount; i++)
                 {
@@ -431,6 +433,11 @@ namespace Prototypist.TaskChain.Benchmark
                         });
                     }
                 }
+
+                actions.Add(() => {
+
+                    var db = tree;
+                });
             };
 
             Action run = () =>
