@@ -11,78 +11,93 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public async Task AddStuff()
         {
-            var student = new ConcurrentArrayList<int>();
-
-            var tasks = new List<Task>();
-            for (var i = 0; i < 20; i++)
+            for (int k = 0; k < 1000; k++)
             {
-                tasks.Add(Task.Run(() =>
+                var student = new ConcurrentArrayList<int>();
+
+                var tasks = new List<Task>();
+                for (var i = 0; i < 20; i++)
                 {
-                    var r = new Random(i);
-                    for (var j = 0; j < 100; j++)
+                    tasks.Add(Task.Run(() =>
                     {
-                        student.EnqueAdd(r.Next(0, 100));
-                    }
-                }));
+                        var r = new Random(i);
+                        for (var j = 0; j < 100; j++)
+                        {
+                            student.EnqueAdd(r.Next(0, 100));
+                        }
+                    }));
+                }
+
+                await Task.WhenAll(tasks.ToArray());
+
+                Assert.Equal(2000, student.Count);
             }
-
-            await Task.WhenAll(tasks.ToArray());
-
-            Assert.Equal(2000, student.Count);
         }
 
         [Fact]
         public void SimpleAddStuff()
         {
-            var student = new ConcurrentArrayList<int>();
-
-
-            var r = new Random();
-            for (var j = 0; j < 100; j++)
+            for (int k = 0; k < 1000; k++)
             {
-                student.EnqueAdd(r.Next(0, 100));
-            }
+                var student = new ConcurrentArrayList<int>();
 
-            Assert.Equal(100, student.Count);
+
+                var r = new Random();
+                for (var j = 0; j < 100; j++)
+                {
+                    student.EnqueAdd(r.Next(0, 100));
+                }
+
+                Assert.Equal(100, student.Count);
+            }
         }
 
         [Fact]
         public void Scramble()
         {
-            var student = new ConcurrentArrayList<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
-
-            Parallel.For(0, 20, (i) =>
+            for (int k = 0; k < 1000; k++)
             {
-                var r = new Random(i);
-                for (var j = 0; j < 100; j++)
+                var student = new ConcurrentArrayList<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
+
+                Parallel.For(0, 20, (i) =>
                 {
-                    student[r.Next(0, 10)] = student[r.Next(0, 10)];
-                }
-            });
+                    var r = new Random(i);
+                    for (var j = 0; j < 100; j++)
+                    {
+                        student[r.Next(0, 10)] = student[r.Next(0, 10)];
+                    }
+                });
+            }
         }
 
         [Fact]
         public void UpdateAndIterate()
         {
-            var student = new ConcurrentArrayList<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
-
-            Assert.ThrowsAny<Exception>(() =>
+            for (int k = 0; k < 1000; k++)
             {
-                foreach (var item in student)
+                var student = new ConcurrentArrayList<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
+
+                Assert.ThrowsAny<Exception>(() =>
                 {
-                    student[0] = item;
-                }
-            });
+                    foreach (var item in student)
+                    {
+                        student[0] = item;
+                    }
+                });
+            }
         }
 
         [Fact]
         public void ReadAndIterate()
         {
-            var student = new ConcurrentArrayList<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
-
-            foreach (var item in student)
+            for (int k = 0; k < 1000; k++)
             {
-                var harmless = student[0];
+                var student = new ConcurrentArrayList<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
+
+                foreach (var item in student)
+                {
+                    var harmless = student[0];
+                }
             }
         }
 
@@ -90,17 +105,20 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void DoubleIterate()
         {
-            var student = new ConcurrentArrayList<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
-            var count = 0;
-
-            foreach (var x in student)
+            for (int k = 0; k < 1000; k++)
             {
-                foreach (var y in student)
+                var student = new ConcurrentArrayList<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
+                var count = 0;
+
+                foreach (var x in student)
                 {
-                    count++;
+                    foreach (var y in student)
+                    {
+                        count++;
+                    }
                 }
+                Assert.Equal(100, count);
             }
-            Assert.Equal(100, count);
         }
 
     }

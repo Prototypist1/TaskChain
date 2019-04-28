@@ -145,13 +145,12 @@ namespace Prototypist.TaskChain
                 {
                     var res = func(value);
                     taskCompletionSource.SetResult(res);
-                    return taskCompletionSource.Task;
                 }
                 catch (Exception e)
                 {
                     taskCompletionSource.SetException(e);
-                    return taskCompletionSource.Task;
                 }
+                return taskCompletionSource.Task;
             }
 
             public Link(Func<TValue, TValue> func) => this.func = func ?? throw new ArgumentNullException(nameof(func));
@@ -183,10 +182,14 @@ namespace Prototypist.TaskChain
         private const int RUNNING = 1;
         private const int STOPPED = 0;
         private int running = STOPPED;
-        protected volatile AbstractLink startOfChain;
-        protected volatile AbstractLink endOfChain = new Link(x => x);
+        protected volatile AbstractLink endOfChain;
+        protected volatile AbstractLink lastRun;
 
-        public QueueingConcurrent(TValue value) => this.value = value;
+        public QueueingConcurrent(TValue value) {
+            this.value = value;
+            endOfChain = new Link(x => x);
+            lastRun = endOfChain;
+        }
 
         public virtual TValue Read()
         {
@@ -216,12 +219,10 @@ namespace Prototypist.TaskChain
         public Func<bool> GetTryEnqueue(Func<TValue, Task<TValue>> func)
         {
             var link = new LinkAsync(func);
-            var localEnd = endOfChain;
             return () =>
             {
-                if (Interlocked.CompareExchange(ref localEnd.next, link, null) == null)
+                if (Interlocked.CompareExchange(ref endOfChain.next, link, null) == null)
                 {
-                    endOfChain = endOfChain.next;
                     return true;
                 }
                 return false;
@@ -232,42 +233,14 @@ namespace Prototypist.TaskChain
         {
             while (true)
             {
-                if (Interlocked.CompareExchange(ref endOfChain.next, link, null) == null)
+                var myEndOfChain = endOfChain;
+                if (Interlocked.CompareExchange(ref myEndOfChain.next, link, null) == null)
                 {
-                    endOfChain = endOfChain.next;
-                    Interlocked.CompareExchange(ref startOfChain, link, null);
+                    Interlocked.CompareExchange(ref endOfChain, link, myEndOfChain);
                     return DoWork();
                 }
-            }
-
-            Task<TValue> DoWork()
-            {
-                if (Interlocked.CompareExchange(ref running, RUNNING, STOPPED) == STOPPED)
-                {
-                    if (startOfChain == null)
-                    {
-                        running = STOPPED;
-                        goto exit;
-                    }
-                    value = startOfChain.Do((TValue)value).Result;
-                    startOfChain = startOfChain.next;
-                    running = STOPPED;
-                    TryProcess();
-                }
-                exit:
-                return link.taskCompletionSource.Task;
-            }
-        }
-        
-        private async Task<TValue> RunAsync(AbstractLink link)
-        {
-            while (true)
-            {
-                if (Interlocked.CompareExchange(ref endOfChain.next, link, null) == null)
-                {
-                    endOfChain = endOfChain.next;
-                    Interlocked.CompareExchange(ref startOfChain, link, null);
-                    return await DoWork();
+                else {
+                    Interlocked.CompareExchange(ref endOfChain, myEndOfChain.next, myEndOfChain);
                 }
             }
 
@@ -275,13 +248,50 @@ namespace Prototypist.TaskChain
             {
                 if (Interlocked.CompareExchange(ref running, RUNNING, STOPPED) == STOPPED)
                 {
-                    if (startOfChain == null)
+                    var mine = lastRun.next;
+                    if (mine == null)
                     {
                         running = STOPPED;
                         goto exit;
                     }
-                    value = await startOfChain.Do((TValue)value);
-                    startOfChain = startOfChain.next;
+                    value = await mine.Do((TValue)value);
+                    lastRun = mine;
+                    running = STOPPED;
+                    TryProcess();
+                }
+                exit:
+                return await link.taskCompletionSource.Task;
+            }
+        }
+        
+        private async Task<TValue> RunAsync(AbstractLink link)
+        {
+            while (true)
+            {
+                var myEndOfChain = endOfChain;
+                if (Interlocked.CompareExchange(ref myEndOfChain.next, link, null) == null)
+                {
+                    Interlocked.CompareExchange(ref endOfChain, link, myEndOfChain);
+                    return await DoWork();
+                }
+                else
+                {
+                    Interlocked.CompareExchange(ref endOfChain, myEndOfChain.next, myEndOfChain);
+                }
+            }
+
+            async Task<TValue> DoWork()
+            {
+                if (Interlocked.CompareExchange(ref running, RUNNING, STOPPED) == STOPPED)
+                {
+                    var mine = lastRun.next;
+                    if (mine == null)
+                    {
+                        running = STOPPED;
+                        goto exit;
+                    }
+                    value = await mine.Do((TValue)value);
+                    lastRun = mine;
                     running = STOPPED;
                     TryProcess();
                 }
@@ -294,12 +304,6 @@ namespace Prototypist.TaskChain
         {
             if (Interlocked.CompareExchange(ref running, RUNNING, STOPPED) == STOPPED)
             {
-                if (startOfChain == null)
-                {
-                    running = STOPPED;
-                    return;
-                }
-
                 Task.Run(Process);
             }
 
@@ -307,13 +311,14 @@ namespace Prototypist.TaskChain
             {
                 do
                 {
-                    do
+                    AbstractLink mine;
+                    while ((mine = lastRun.next) != null)
                     {
-                        value = await startOfChain.Do((TValue)value);
-                        startOfChain = startOfChain.next;
-                    } while (startOfChain != null);
+                        value = await mine.Do((TValue)value);
+                        lastRun = mine;
+                    } 
                     running = STOPPED;
-                } while (startOfChain != null && Interlocked.CompareExchange(ref running, RUNNING, STOPPED) == STOPPED);
+                } while (lastRun.next != null && Interlocked.CompareExchange(ref running, RUNNING, STOPPED) == STOPPED);
             }
         }
         

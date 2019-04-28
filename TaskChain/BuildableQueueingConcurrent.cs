@@ -9,12 +9,12 @@ namespace Prototypist.TaskChain
         private volatile object build;
         public BuildableQueueingConcurrent() : base(default)
         {
-            startOfChain = new Link(x =>
+            lastRun = new Link(x =>
             {
                 eventSlim.Wait();
                 return (TValue)build;
             });
-            endOfChain = startOfChain;
+            endOfChain = lastRun;
         }
 
         public void Build(TValue value) {

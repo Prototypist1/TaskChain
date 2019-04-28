@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Prototypist.TaskChain
 {
-    public class RawConcurrentGrowingIndexedTree2<TKey, TValue>// : IReadOnlyDictionary<TKey, TValue>
+    public class RawConcurrentGrowingIndexedTree2<TKey, TValue> : IReadOnlyDictionary<TKey, TValue>
     {
 
         private class Value 
@@ -81,56 +81,6 @@ namespace Prototypist.TaskChain
                     strings.Add(string.Join(", ", indexes) + " : " + IntToString(value.hash, 32));
                 }
             }
-        }
-
-        private void CheckCount(TKey key) {
-            //var subCound = SubCount(orchard.items);
-            //if (subCound != count)
-            //{
-            //    var error = 0;
-            //}
-            //var pd = PlacementDebugger();
-            //if (pd != "")
-            //{
-            //    var error = 0;
-            //}
-
-            if (!TryGetValue(key, out var _)) {
-                var db = PlacementDebugger();
-            }
-        }
-
-        private int SubCount(object thing) {
-            if (thing is null) {
-                return 0;
-            }
-
-            if (thing is Value value) {
-                return 1 + SubCount(value.next);
-            }
-
-            if (thing is object[] things) {
-                return things.Sum(x => SubCount(x));
-            }
-
-            throw new Exception("bug");
-        }
-
-        public static string Reverse(string s)
-        {
-            char[] charArray = s.ToCharArray();
-            Array.Reverse(charArray);
-            return new string(charArray);
-        }
-
-        private static string IntToString(int i, int bits)
-        {
-            var res = "";
-            for (int j = bits - 1; j >= 0; j--)
-            {
-                res += i >> j & 1;
-            }
-            return res;
         }
 
         public TValue this[TKey key] => GetOrThrow(key);
@@ -459,37 +409,119 @@ namespace Prototypist.TaskChain
             return false;
         }
 
-        //public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
-        //{
-        //    foreach (var l1 in root)
-        //    {
-        //        yield return l1;
-        //    }
-        //}
+        private IEnumerable<KeyValuePair<TKey, TValue>> Iterate(object thing)
+        {
+            
+            if (thing is Value value)
+            {
+                yield return new KeyValuePair<TKey, TValue>(value.key,value.value);
+            }
 
-        //public IEnumerable<TKey> Keys
-        //{
-        //    get
-        //    {
-        //        foreach (var item in this)
-        //        {
-        //            yield return item.Key;
-        //        }
-        //    }
-        //}
+            if (thing is object[] things)
+            {
+                foreach (var item in Iterate(things))
+                {
+                    yield return item;
+                }
+            }
+        }
 
-        //public IEnumerable<TValue> Values
-        //{
-        //    get
-        //    {
-        //        foreach (var item in this)
-        //        {
-        //            yield return item.Value;
-        //        }
-        //    }
-        //}
+        public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
+        {
+            foreach (var thing in orchard.items)
+            {
+                foreach (var item in Iterate(thing))
+                {
+                    yield return item;
+                }
+            }
+        }
 
-        //IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        public IEnumerable<TKey> Keys
+        {
+            get
+            {
+                foreach (var item in this)
+                {
+                    yield return item.Key;
+                }
+            }
+        }
+
+        public IEnumerable<TValue> Values
+        {
+            get
+            {
+                foreach (var item in this)
+                {
+                    yield return item.Value;
+                }
+            }
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+
+        #region Debugging
+
+        private void CheckCount(TKey key)
+        {
+            //var subCound = SubCount(orchard.items);
+            //if (subCound != count)
+            //{
+            //    var error = 0;
+            //}
+            //var pd = PlacementDebugger();
+            //if (pd != "")
+            //{
+            //    var error = 0;
+            //}
+
+            if (!TryGetValue(key, out var _))
+            {
+                var db = PlacementDebugger();
+            }
+        }
+
+        private int SubCount(object thing)
+        {
+            if (thing is null)
+            {
+                return 0;
+            }
+
+            if (thing is Value value)
+            {
+                return 1 + SubCount(value.next);
+            }
+
+            if (thing is object[] things)
+            {
+                return things.Sum(x => SubCount(x));
+            }
+
+            throw new Exception("bug");
+        }
+
+        public static string Reverse(string s)
+        {
+            char[] charArray = s.ToCharArray();
+            Array.Reverse(charArray);
+            return new string(charArray);
+        }
+
+        private static string IntToString(int i, int bits)
+        {
+            var res = "";
+            for (int j = bits - 1; j >= 0; j--)
+            {
+                res += i >> j & 1;
+            }
+            return res;
+        }
+
+
+        #endregion
 
     }
 }
