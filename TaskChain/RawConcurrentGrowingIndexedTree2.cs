@@ -9,8 +9,6 @@ namespace Prototypist.TaskChain
 {
     public class RawConcurrentGrowingIndexedTree2<TKey, TValue> : IReadOnlyDictionary<TKey, TValue>
     {
-        public int depth;
-
 
         private class Value
         {
@@ -53,16 +51,28 @@ namespace Prototypist.TaskChain
 
         public TValue this[TKey key] => GetOrThrow(key);
 
-        private Orchard orchard = new Orchard(new object[][] {
-            new object[arraySize],new object[arraySize],new object[arraySize],new object[arraySize],
-            new object[arraySize],new object[arraySize],new object[arraySize],new object[arraySize],
-            new object[arraySize],new object[arraySize],new object[arraySize],new object[arraySize],
-            new object[arraySize],new object[arraySize],new object[arraySize],new object[arraySize]
-        }, 4, 0b1111);
-        private const int arrayMask = 0b1;
-        private const int sizeInBit = 1;
-        private const int arraySize = 2;
-        private const int resizingSize = 0b1111111;
+        private readonly Orchard orchard;
+        private readonly int arrayMask = 0b1;
+        private readonly int sizeInBit = 1;
+        private readonly int arraySize = 2;
+        private readonly int resizingSize = 0b1111111;
+
+
+        public RawConcurrentGrowingIndexedTree2() : this(1, 7) { }
+
+        public RawConcurrentGrowingIndexedTree2(int sizeInBit, int resizingSizeInBits)
+        {
+            this.arrayMask = (1<< sizeInBit) -1;
+            this.sizeInBit = sizeInBit;
+            this.arraySize = 1 << sizeInBit;
+            this.resizingSize = (1 << resizingSizeInBits) - 1;
+            orchard = new Orchard(new object[][] {
+                new object[arraySize],new object[arraySize],new object[arraySize],new object[arraySize],
+                new object[arraySize],new object[arraySize],new object[arraySize],new object[arraySize],
+                new object[arraySize],new object[arraySize],new object[arraySize],new object[arraySize],
+                new object[arraySize],new object[arraySize],new object[arraySize],new object[arraySize]
+            }, 4, 0b1111);
+        }
 
         public bool ContainsKey(TKey key) => TryGetValue(key, out var _);
 
@@ -232,7 +242,6 @@ namespace Prototypist.TaskChain
         IsArray:
             if (at is object[])
             {
-                Interlocked.Increment(ref depth);
                 totalSizeInBits += sizeInBit;
                 array = at as object[];
                 at = array[(hash >> totalSizeInBits) & arrayMask];
@@ -337,6 +346,7 @@ namespace Prototypist.TaskChain
 
         private int at = 0;
         private int resizing = 0;
+
 
         private async Task<bool> TryResize()
         {
