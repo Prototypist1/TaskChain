@@ -12,21 +12,66 @@ namespace Prototypist.TaskChain.Benchmark
     {
         private const int AcountCount = 1000000;
         private const int Range = 100000;
-        private const int Runs = 50;
-        private const int WarmUpRuns = 5;
+        private const int Runs = 10;
+        private const int WarmUpRuns = 1;
 
         static void Main(string[] _)
         {
+
+            //foreach (var i in new[] { 10, 100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000 }){
+            //    var tree = new RawConcurrentGrowingIndexedTree2<Guid, string>();
+            //    var guidList = new List<Guid>();
+            //    for (int ii = 0; ii < i; ii++)
+            //    {
+            //        guidList.Add(Guid.NewGuid());
+            //    }
+            //    foreach (var guid in guidList)
+            //    {
+            //        tree.GetOrAdd(guid, guid.ToString());
+            //    }
+
+            //    var watch = System.Diagnostics.Stopwatch.StartNew();
+            //    Parallel.Invoke(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 }.Select(x =>
+            //    {
+            //        Action a = () =>
+            //        {
+            //            for (int j = x; j < guidList.Count; j += 12)
+            //            {
+
+            //                tree.TryGetValue(guidList[j], out var _);
+            //            }
+            //        };
+            //        return a;
+            //    }).ToArray());
+
+            //    watch.Stop();
+            //    Console.WriteLine($"reads: {i}, depth per read: {((double)tree.depth)/i}, took: {((double)watch.ElapsedTicks*1_000_000) / (TimeSpan.TicksPerMillisecond* i) }");
+            //}
+
+
             //var summary = BenchmarkRunner.Run<ReadAllItems>();
             //var summary = BenchmarkRunner.Run<WriteAllItems>();
             //var summary = BenchmarkRunner.Run<ParallelUpdate>();
             //var summary = BenchmarkRunner.Run<InterlockedTest>();
+            //Console.WriteLine("JustReadFromAnArrayALot 1000000         " + JustReadFromAnArrayALot(100000000, 1, 0));
+            //Console.WriteLine("Growing tree read 100         " + BenchmarkGrowingTreeRead(100, Runs, WarmUpRuns));
+            //Console.WriteLine("Growing tree read 1000        " + BenchmarkGrowingTreeRead(1000, Runs, WarmUpRuns));
+            //Console.WriteLine("Growing tree read 10000       " + BenchmarkGrowingTreeRead(10000, Runs, WarmUpRuns));
+            //Console.WriteLine("Growing tree read 100000      " + BenchmarkGrowingTreeRead(100000, Runs, WarmUpRuns));
+            //Console.WriteLine("Growing tree read 1000000     " + BenchmarkGrowingTreeRead(1000000, 1, 0));
 
-            Console.WriteLine("Classics read 100         " + BenchmarkGrowingTreeRead(100, Runs, WarmUpRuns));
-            Console.WriteLine("Classics read 1000        " + BenchmarkGrowingTreeRead(1000, Runs, WarmUpRuns));
-            Console.WriteLine("Classics read 10000       " + BenchmarkGrowingTreeRead(10000, Runs, WarmUpRuns));
-            Console.WriteLine("Classics read 100000      " + BenchmarkGrowingTreeRead(100000, Runs, WarmUpRuns));
-            Console.WriteLine("Classics read 1000000     " + BenchmarkGrowingTreeRead(1000000, Runs, WarmUpRuns));
+            Console.WriteLine("Growing tree 2 read 100         " + BenchmarkGrowingTree2Read(100, Runs, WarmUpRuns));
+            Console.WriteLine("Growing tree 2 read 1000        " + BenchmarkGrowingTree2Read(1000, Runs, WarmUpRuns));
+            Console.WriteLine("Growing tree 2 read 10000       " + BenchmarkGrowingTree2Read(10000, Runs, WarmUpRuns));
+            Console.WriteLine("Growing tree 2 read 100000      " + BenchmarkGrowingTree2Read(100000, Runs, WarmUpRuns));
+            Console.WriteLine("Growing tree 2 read 1000000     " + BenchmarkGrowingTree2Read(1000000, Runs, WarmUpRuns));
+
+
+            //Console.WriteLine("Classic read 100         " + BenchmarkClassicRead(100, Runs, WarmUpRuns));
+            //Console.WriteLine("Classic read 1000        " + BenchmarkClassicRead(1000, Runs, WarmUpRuns));
+            //Console.WriteLine("Classic read 10000       " + BenchmarkClassicRead(10000, Runs, WarmUpRuns));
+            //Console.WriteLine("Classic read 100000      " + BenchmarkClassicRead(100000, Runs, WarmUpRuns));
+            //Console.WriteLine("Classic read 1000000     " + BenchmarkClassicRead(1000000, Runs, WarmUpRuns));
 
             //Console.WriteLine("Growing tree read  " + BenchmarkGrowingTreeRead(AcountCount, Runs, WarmUpRuns));
             //Console.WriteLine("Tree read          " + BenchmarkTreeRead(AcountCount, Runs, WarmUpRuns));
@@ -209,6 +254,50 @@ namespace Prototypist.TaskChain.Benchmark
 
         }
 
+
+        private class ArrayHolder {
+            public Memory<string> array;
+        }
+
+        static string JustReadFromAnArrayALot(int acountCount, int runs, int warmUpRuns)
+        {
+            var rand = new Random();
+
+
+            List<Action> actions = null;
+            ArrayHolder ah = new ArrayHolder();
+
+            Action stepUp = () =>
+            {
+                var tree = new string[100];
+                for (int i = 0; i < 100; i++)
+                {
+                    tree[i] = "thing " + i;
+                }
+                ah.array = tree;
+
+                Action action = () =>
+                {
+                    var _ = ah.array.Span[(int)rand.Next(100)];
+                };
+
+                actions = new List<Action>();
+                for (int i = 0; i < acountCount; i++)
+                {
+                    actions.Add(action);
+                }
+            };
+
+            Action run = () =>
+            {
+                Parallel.Invoke(actions.ToArray());
+            };
+
+            return MyStupidBenchmarker.Benchmark(stepUp, run, runs, warmUpRuns).ToString();
+
+        }
+
+
         static string BenchmarkGrowingTreeRead(int acountCount, int runs, int warmUpRuns)
         {
             var rand = new Random();
@@ -219,6 +308,41 @@ namespace Prototypist.TaskChain.Benchmark
             Action stepUp = () =>
             {
                 var tree = new RawConcurrentGrowingIndexedTree<Guid, string>();
+                actions = new List<Action>();
+                for (int i = 0; i < acountCount; i++)
+                {
+
+                    var guid = Guid.NewGuid();
+                    tree.GetOrAdd(guid, guid.ToString());
+
+                    actions.Add(() =>
+                    {
+                        tree.TryGetValue(guid, out var _);
+                    });
+
+                }
+            };
+
+            Action run = () =>
+            {
+                Parallel.Invoke(actions.ToArray());
+            };
+
+            return MyStupidBenchmarker.Benchmark(stepUp, run, runs, warmUpRuns).ToString();
+
+        }
+
+
+        static string BenchmarkGrowingTree2Read(int acountCount, int runs, int warmUpRuns)
+        {
+            var rand = new Random();
+
+
+            List<Action> actions = null;
+
+            Action stepUp = () =>
+            {
+                var tree = new RawConcurrentGrowingIndexedTree2<Guid, string>();
                 actions = new List<Action>();
                 for (int i = 0; i < acountCount; i++)
                 {

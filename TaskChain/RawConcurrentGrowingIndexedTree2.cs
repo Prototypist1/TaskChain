@@ -9,6 +9,8 @@ namespace Prototypist.TaskChain
 {
     public class RawConcurrentGrowingIndexedTree2<TKey, TValue> : IReadOnlyDictionary<TKey, TValue>
     {
+        public int depth;
+
 
         private class Value
         {
@@ -25,13 +27,13 @@ namespace Prototypist.TaskChain
             }
         }
 
-        private struct Orchard
+        private class Orchard
         {
-            public readonly object[] items;
+            public readonly object[][] items;
             public readonly int sizeInBit;
             public readonly int mask;
 
-            public Orchard(object[] items, int size, int mask)
+            public Orchard(object[][] items, int size, int mask)
             {
                 this.items = items ?? throw new ArgumentNullException(nameof(items));
                 this.sizeInBit = size;
@@ -51,9 +53,16 @@ namespace Prototypist.TaskChain
 
         public TValue this[TKey key] => GetOrThrow(key);
 
-        private Orchard orchard = new Orchard(new object[16], 4, 0b1111);
-        private const int arrayMask = 0b11;
-        private const int sizeInBit = 2;
+        private Orchard orchard = new Orchard(new object[][] {
+            new object[arraySize],new object[arraySize],new object[arraySize],new object[arraySize],
+            new object[arraySize],new object[arraySize],new object[arraySize],new object[arraySize],
+            new object[arraySize],new object[arraySize],new object[arraySize],new object[arraySize],
+            new object[arraySize],new object[arraySize],new object[arraySize],new object[arraySize]
+        }, 4, 0b1111);
+        private const int arrayMask = 0b1;
+        private const int sizeInBit = 1;
+        private const int arraySize = 2;
+        private const int resizingSize = 0b1111111;
 
         public bool ContainsKey(TKey key) => TryGetValue(key, out var _);
 
@@ -74,37 +83,27 @@ namespace Prototypist.TaskChain
             Value toAdd;
             object[] newIndex, localIndex;
             object nextAt;
-
-            int totalSizeInBits = 0, localOffset;
-
-            var localOrchard = orchard;
-            var array = localOrchard.items;
+            int localOffset;
 
             var hash = key.GetHashCode();
 
-            var at = array[hash & localOrchard.mask];
+            var localOrchard = orchard;
+            var array = localOrchard.items[hash & localOrchard.mask];
+            var at = array[(hash >> localOrchard.sizeInBit) & arrayMask];
+            int totalSizeInBits = localOrchard.sizeInBit;
 
+        WhereToOffOrchard:
             if (at is object[])
             {
                 array = at as object[];
-                totalSizeInBits += localOrchard.sizeInBit;
+                totalSizeInBits += sizeInBit;
                 at = array[(hash >> totalSizeInBits) & arrayMask];
                 goto WhereToOffOrchard;
             }
 
-            if (at is null)
+            if (at == null)
             {
-                toAdd = new Value(hash, key, value);
-                if ((at = Interlocked.CompareExchange(ref localOrchard.items[hash & localOrchard.mask], toAdd, null)) == null)
-                {
-                    if ((Interlocked.Increment(ref count) & 0b1111111) == 0b0) {
-#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
-                        TryResize();
-#pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
-                    }
-                    return toAdd.value;
-                }
-                goto WhereToWithToAdd;
+                goto IsNullOffOrcard;
             }
 
             if ((existingValue = at as Value) != null)
@@ -113,95 +112,10 @@ namespace Prototypist.TaskChain
                 {
                     goto HashMatch;
                 }
-                newIndex = new object[4];
-                localOffset = localOrchard.sizeInBit;
-                localIndex = newIndex;
-                toAdd = new Value(hash, key, value);
-                while (((existingValue.hash >> (localOffset)) & arrayMask) == ((toAdd.hash >> (localOffset)) & arrayMask))
-                {
-                    var nextLocalIndex = new object[4];
-                    localIndex[((existingValue.hash >> (localOffset)) & arrayMask)] = nextLocalIndex;
-                    localIndex = nextLocalIndex;
-                    localOffset += sizeInBit;
-                }
-                localIndex[(existingValue.hash >> (localOffset)) & arrayMask] = existingValue;
-                localIndex[(toAdd.hash >> (localOffset)) & arrayMask] = toAdd;
-                nextAt = Interlocked.CompareExchange(ref localOrchard.items[hash & localOrchard.mask], newIndex, at);
-                if (ReferenceEquals(nextAt, at))
-                {
-                    if ((Interlocked.Increment(ref count) & 0b1111111) == 0b0)
-                    {
-#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
-                        TryResize();
-#pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
-                    }
-                    return toAdd.value;
-                }
-                at = nextAt;
-                // we actually know this is an array
-                goto WhereToWithToAdd;
+                goto IsValueOffOrcard;
             }
-            throw new Exception("code should never get here");
+            throw new Exception("this should never happen");
 
-
-        WhereToWithToAdd:
-            if (at is object[])
-            {
-                array = at as object[];
-                totalSizeInBits += localOrchard.sizeInBit;
-                at = array[(hash >> totalSizeInBits) & arrayMask];
-                goto WhereToWithToAddOffOrchard;
-            }
-
-            if (at is null)
-            {
-                if ((at = Interlocked.CompareExchange(ref localOrchard.items[hash & localOrchard.mask], toAdd, null)) == null)
-                {
-                    if ((Interlocked.Increment(ref count) & 0b1111111) == 0b0)
-                    {
-#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
-                        TryResize();
-#pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
-                    }
-                    return toAdd.value;
-                }
-                goto WhereToWithToAdd;
-            }
-
-            if ((existingValue = at as Value) != null)
-            {
-                if (existingValue.hash == hash)
-                {
-                    goto HashMatch;
-                }
-                newIndex = new object[4];
-                localOffset = localOrchard.sizeInBit;
-                localIndex = newIndex;
-                while (((existingValue.hash >> (localOffset)) & arrayMask) == ((toAdd.hash >> (localOffset)) & arrayMask))
-                {
-                    var nextLocalIndex = new object[4];
-                    localIndex[((existingValue.hash >> (localOffset)) & arrayMask)] = nextLocalIndex;
-                    localIndex = nextLocalIndex;
-                    localOffset += sizeInBit;
-                }
-                localIndex[(existingValue.hash >> (localOffset)) & arrayMask] = existingValue;
-                localIndex[(toAdd.hash >> (localOffset)) & arrayMask] = toAdd;
-                nextAt = Interlocked.CompareExchange(ref localOrchard.items[hash & localOrchard.mask], newIndex, at);
-                if (ReferenceEquals(nextAt, at))
-                {
-                    if ((Interlocked.Increment(ref count) & 0b1111111) == 0b0)
-                    {
-#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
-                        TryResize();
-#pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
-                    }
-                    return toAdd.value;
-                }
-                at = nextAt;
-                // we actually know this is an array
-                goto WhereToWithToAdd;
-            }
-            throw new Exception("code should never get here");
 
         WhereToWithToAddOffOrchard:
             if (at is object[])
@@ -228,30 +142,6 @@ namespace Prototypist.TaskChain
 
             throw new Exception("this should never happen");
 
-        WhereToOffOrchard:
-            if (at is object[])
-            {
-                array = at as object[];
-                totalSizeInBits += sizeInBit;
-                at = array[(hash >> totalSizeInBits) & arrayMask];
-                goto WhereToOffOrchard;
-            }
-
-            if (at == null)
-            {
-                goto IsNullOffOrcard;
-            }
-
-            if ((existingValue = at as Value) != null)
-            {
-                if (existingValue.hash == hash)
-                {
-                    goto HashMatch;
-                }
-                goto IsValueOffOrcard;
-            }
-            throw new Exception("this should never happen");
-
         IsNullOffOrcard:
             toAdd = new Value(hash, key, value);
         IsNullWithToAddOffOrcard:
@@ -265,12 +155,12 @@ namespace Prototypist.TaskChain
         IsValueOffOrcard:
             toAdd = new Value(hash, key, value);
         IsValueWithToAdd:
-            newIndex = new object[4];
+            newIndex = new object[arraySize];
             localOffset = totalSizeInBits + sizeInBit;
             localIndex = newIndex;
             while (((existingValue.hash >> (localOffset)) & arrayMask) == ((toAdd.hash >> (localOffset)) & arrayMask))
             {
-                var nextLocalIndex = new object[4];
+                var nextLocalIndex = new object[arraySize];
                 localIndex[((existingValue.hash >> (localOffset)) & arrayMask)] = nextLocalIndex;
                 localIndex = nextLocalIndex;
                 localOffset += sizeInBit;
@@ -280,9 +170,11 @@ namespace Prototypist.TaskChain
             nextAt = Interlocked.CompareExchange(ref array[(hash >> totalSizeInBits) & arrayMask], newIndex, at);
             if (ReferenceEquals(nextAt, at))
             {
-                if ((Interlocked.Increment(ref count) & 0b1111111) == 0b0)
+                if ((Interlocked.Increment(ref count) & resizingSize) == 0b0)
                 {
+#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
                     TryResize();
+#pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
                 }
                 return toAdd.value;
             }
@@ -312,9 +204,11 @@ namespace Prototypist.TaskChain
                     return existingValue.value;
                 }
             }
-            if ((Interlocked.Increment(ref count) & 0b1111111) == 0b0)
+            if ((Interlocked.Increment(ref count) & resizingSize) == 0b0)
             {
+#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
                 TryResize();
+#pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
             }
             return toAdd.value;
         }
@@ -328,60 +222,37 @@ namespace Prototypist.TaskChain
 
             Value existingValue;
 
-            int totalSizeInBits = 0;
-
-            var localOrchard = orchard;
-            var array = localOrchard.items;
-
             var hash = key.GetHashCode();
 
-            var at = array[hash & localOrchard.mask];
+            var localOrchard = orchard;
+            var array = localOrchard.items[hash & localOrchard.mask];
+            var at = array[(hash >> localOrchard.sizeInBit) & arrayMask];
+            int totalSizeInBits = localOrchard.sizeInBit;
 
-            if ((array = at as object[]) != null)
+        IsArray:
+            if (at is object[])
             {
-                totalSizeInBits += localOrchard.sizeInBit;
-            IsArray:
+                Interlocked.Increment(ref depth);
+                totalSizeInBits += sizeInBit;
+                array = at as object[];
                 at = array[(hash >> totalSizeInBits) & arrayMask];
-                if (at is object[])
-                {
-                    totalSizeInBits += sizeInBit;
-                    array = at as object[];
-                    goto IsArray;
-                }
-                if (at == null)
-                {
-                    res = default;
-                    return false;
-                }
-                if ((existingValue = at as Value) != null)
-                {
-                    if (existingValue.hash == hash)
-                    {
-                        goto HashMatch;
-                    }
-                    res = default;
-                    return false;
-                }
-                throw new Exception("this should never happen");
+                goto IsArray;
             }
-
-            if (at is null)
+            if (at == null)
             {
                 res = default;
                 return false;
             }
-
             if ((existingValue = at as Value) != null)
             {
                 if (existingValue.hash == hash)
                 {
                     goto HashMatch;
                 }
-
                 res = default;
                 return false;
             }
-            throw new Exception("code should never get here");
+            throw new Exception("this should never happen");
 
         HashMatch:
             if (existingValue.key.Equals(key))
@@ -471,22 +342,30 @@ namespace Prototypist.TaskChain
         {
             return await Task.Run(() =>
             {
-                if (Interlocked.CompareExchange(ref resizing, 1, 0) == 0 && CanResize())
+                if (Interlocked.CompareExchange(ref resizing, 1, 0) == 0)
                 {
-                    var array = new object[orchard.items.Length * 4];
-
-                    for (int i = 0; i < orchard.items.Length; i++)
+                    if (CanResize())
                     {
-                        var target = orchard.items[i] as object[];
-                        for (int j = 0; j < target.Length; j++)
-                        {
-                            array[(j * orchard.items.Length) + i] = target[j];
-                        }
-                    }
-                    orchard = new Orchard(array, orchard.sizeInBit + sizeInBit, (orchard.mask << sizeInBit) | arrayMask);
+                        var array = new object[orchard.items.Length * arraySize][];
 
-                    at = 0;
-                    return true;
+                        for (int i = 0; i < orchard.items.Length; i++)
+                        {
+                            var target = orchard.items[i] as object[];
+                            for (int j = 0; j < target.Length; j++)
+                            {
+                                array[(j * orchard.items.Length) + i] = (object[])target[j];
+                            }
+                        }
+                        orchard = new Orchard(array, orchard.sizeInBit + sizeInBit, (orchard.mask << sizeInBit) | arrayMask);
+
+                        at = 0;
+                        resizing = 0;
+                        return true;
+                    }
+                    else
+                    {
+                        resizing = 0;
+                    }
                 }
                 return false;
             });
@@ -494,32 +373,35 @@ namespace Prototypist.TaskChain
 
         private bool CanResize()
         {
-
+            var filledIn = 0;
             while (at < orchard.items.Length)
             {
                 var target = orchard.items[at];
-                if (target == null)
+                for (int i = 0; i < target.Length; i++)
                 {
-                    return false;
+                    var innerTarget = target[i];
 
-                }
-                if (target is object[] array)
-                {
-                    for (int i = 0; i < array.Length; i++)
+                    if (innerTarget is null)
                     {
-                        var innerTarget = orchard.items[at];
-                        if (!(innerTarget is object[]))
-                        {
-                            return false;
+                        filledIn++;
+                        var toAdd = new object[arraySize];
+                        innerTarget = Interlocked.CompareExchange(ref target[i], toAdd, null);
+                    }
 
-                        }
+                    if (innerTarget is Value value)
+                    {
+                        filledIn++;
+                        var toAdd = new object[arraySize];
+                        toAdd[(value.hash >> (orchard.sizeInBit + arrayMask)) & arrayMask] = value;
+                        Interlocked.CompareExchange(ref target[i], toAdd, value);
+                    }
+
+                    if (filledIn >= resizingSize)
+                    {
+                        return false;
                     }
                 }
-                else
-                {
-                    return false;
 
-                }
                 at++;
             }
             return true;
@@ -537,7 +419,7 @@ namespace Prototypist.TaskChain
             var strings = new List<string>();
             for (int i = 0; i < orchard.items.Length; i++)
             {
-                PlacementDebugger(orchard.items[i], 2, new string[] { IntToString(i, 4) }, strings);
+                PlacementDebugger(orchard.items[i], sizeInBit, new string[] { IntToString(i, orchard.sizeInBit) }, strings);
             }
             return string.Join(Environment.NewLine, strings);
         }
@@ -555,7 +437,7 @@ namespace Prototypist.TaskChain
                 {
                     var nextIndex = indexes.Select(x => x).ToList();
                     nextIndex.Add(IntToString(i, width));
-                    PlacementDebugger(objects[i], 2, nextIndex.ToArray(), strings);
+                    PlacementDebugger(objects[i], sizeInBit, nextIndex.ToArray(), strings);
                 }
                 return;
             }

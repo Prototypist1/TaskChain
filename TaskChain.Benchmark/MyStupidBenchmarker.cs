@@ -33,7 +33,7 @@ namespace Prototypist.TaskChain.Benchmark
 
             public override string ToString()
             {
-                return $"average: {average}, std: {std}"; 
+                return $"average: {average/ TimeSpan.TicksPerMillisecond}, std: {std/ TimeSpan.TicksPerMillisecond}"; 
             }
         }
 
@@ -41,9 +41,7 @@ namespace Prototypist.TaskChain.Benchmark
             for (int i = 0; i < warmupRuns; i++)
             {
                 setup();
-                var watch = System.Diagnostics.Stopwatch.StartNew();
                 run();
-                watch.Stop();
             }
 
             var times = new List<long>();
