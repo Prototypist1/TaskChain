@@ -18,6 +18,9 @@ namespace Prototypist.TaskChain.Benchmark
         static void Main(string[] _)
         {
 
+            var summary = BenchmarkRunner.Run<ReadAllItems>();
+            Console.WriteLine(summary);
+
             //foreach (var i in new[] { 10, 100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000 }){
             //    var tree = new RawConcurrentGrowingIndexedTree2<Guid, string>();
             //    var guidList = new List<Guid>();
@@ -60,11 +63,11 @@ namespace Prototypist.TaskChain.Benchmark
             //Console.WriteLine("Growing tree read 100000      " + BenchmarkGrowingTreeRead(100000, Runs, WarmUpRuns));
             //Console.WriteLine("Growing tree read 1000000     " + BenchmarkGrowingTreeRead(1000000, 1, 0));
 
-            Console.WriteLine("Growing tree 2 read 100         " + BenchmarkGrowingTree2Read(100, Runs, WarmUpRuns));
-            Console.WriteLine("Growing tree 2 read 1000        " + BenchmarkGrowingTree2Read(1000, Runs, WarmUpRuns));
-            Console.WriteLine("Growing tree 2 read 10000       " + BenchmarkGrowingTree2Read(10000, Runs, WarmUpRuns));
-            Console.WriteLine("Growing tree 2 read 100000      " + BenchmarkGrowingTree2Read(100000, Runs, WarmUpRuns));
-            Console.WriteLine("Growing tree 2 read 1000000     " + BenchmarkGrowingTree2Read(1000000, Runs, WarmUpRuns));
+            //Console.WriteLine("Growing tree 2 read 100         " + BenchmarkGrowingTree2Read(100, Runs, WarmUpRuns));
+            //Console.WriteLine("Growing tree 2 read 1000        " + BenchmarkGrowingTree2Read(1000, Runs, WarmUpRuns));
+            //Console.WriteLine("Growing tree 2 read 10000       " + BenchmarkGrowingTree2Read(10000, Runs, WarmUpRuns));
+            //Console.WriteLine("Growing tree 2 read 100000      " + BenchmarkGrowingTree2Read(100000, Runs, WarmUpRuns));
+            //Console.WriteLine("Growing tree 2 read 1000000     " + BenchmarkGrowingTree2Read(1000000, Runs, WarmUpRuns));
 
 
             //Console.WriteLine("Classic read 100         " + BenchmarkClassicRead(100, Runs, WarmUpRuns));

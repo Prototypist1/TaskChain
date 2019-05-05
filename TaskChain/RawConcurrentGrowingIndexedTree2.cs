@@ -51,14 +51,14 @@ namespace Prototypist.TaskChain
 
         public TValue this[TKey key] => GetOrThrow(key);
 
-        private readonly Orchard orchard;
+        private Orchard orchard;
         private readonly int arrayMask = 0b1;
         private readonly int sizeInBit = 1;
         private readonly int arraySize = 2;
         private readonly int resizingSize = 0b1111111;
 
 
-        public RawConcurrentGrowingIndexedTree2() : this(1, 7) { }
+        public RawConcurrentGrowingIndexedTree2() : this(4, 10) { }
 
         public RawConcurrentGrowingIndexedTree2(int sizeInBit, int resizingSizeInBits)
         {
