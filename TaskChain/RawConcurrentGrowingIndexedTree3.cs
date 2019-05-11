@@ -25,6 +25,15 @@ namespace Prototypist.TaskChain
             }
         }
 
+        private struct PassThrough {
+            public PassThrough(Memory<object> memory)
+            {
+                this.memory = memory;
+            }
+
+            public readonly Memory<object> memory;
+        }
+
         private class Orchard
         {
             public readonly object[] items;
@@ -55,16 +64,27 @@ namespace Prototypist.TaskChain
         private readonly int arrayMask;
         private readonly int sizeInBit;
         private readonly int arraySize;
+        private int targetOrchardSize;
 
+        // TODO you are here
+        // at large size we are full of nearly empty list
+        // list spawn more lists
+        // I think we need to maintain a next list and use memory more aggressively
 
-        public RawConcurrentGrowingIndexedTree3() : this(4) { }
+        // I sometimes miss resizing
+        // if too many items are added while we are resizing
+        // when the new orchard is swaped in it is smaller than the count so we never grow again
+        // if we are bigger then double the current target try to double the target if you get it enqueue
+
+        public RawConcurrentGrowingIndexedTree3() : this(2) { }
 
         public RawConcurrentGrowingIndexedTree3(int sizeInBit)
         {
             this.arrayMask = (1 << sizeInBit) - 1;
             this.sizeInBit = sizeInBit;
             this.arraySize = 1 << sizeInBit;
-            orchard = new Orchard(new object[16], 4, 0b1111);
+            this.orchard = new Orchard(new object[16], 4, 0b1111);
+            this.targetOrchardSize = orchard.items.Length;
         }
 
         public bool ContainsKey(TKey key) => TryGetValue(key, out var _);
@@ -86,47 +106,18 @@ namespace Prototypist.TaskChain
             Value toAdd;
             object[] newIndex, localIndex;
             object nextAt;
-            int localOffset;
+            int localOffset, size;
+            Span<object> array;
 
             var hash = key.GetHashCode();
 
             var localOrchard = orchard;
-            var array = new Span<object>(localOrchard.items);
-            int totalSizeInBits = localOrchard.sizeInBit;
-            var at = array[(hash >> (32 - totalSizeInBits)) & localOrchard.mask];
+            int totalSizeInBits = 32 - localOrchard.sizeInBit;
+            var at = localOrchard.items[(hash >> (totalSizeInBits)) & localOrchard.mask];
 
 #pragma warning disable CS0164 // This label has not been referenced
         WhereTo:
 #pragma warning restore CS0164 // This label has not been referenced
-            if (at is object[])
-            {
-                array = new Span<object>(at as object[]);
-                totalSizeInBits += sizeInBit;
-                at = array[(hash >> (32 - totalSizeInBits)) & arrayMask];
-                goto WhereToOffOrchard;
-            }
-
-            if (at is Memory<object>)
-            {
-                array = ((Memory<object>)at).Span;
-                totalSizeInBits += sizeInBit;
-                at = array[(hash >> (32 - totalSizeInBits)) & arrayMask];
-                goto WhereToOffOrchard;
-            }
-
-            if (at == null)
-            {
-                toAdd = new Value(hash, key, value);
-                if ((at = Interlocked.CompareExchange(ref array[(hash >> (32 - totalSizeInBits)) & localOrchard.mask], toAdd, null)) == null)
-                {
-                    if (Interlocked.Increment(ref count) == orchard.items.Length)
-                    {
-                        Resize();
-                    }
-                    return toAdd.value;
-                }
-                goto WhereToWithToAdd;
-            }
 
             if ((existingValue = at as Value) != null)
             {
@@ -136,23 +127,24 @@ namespace Prototypist.TaskChain
                 }
                 toAdd = new Value(hash, key, value);
                 newIndex = new object[arraySize];
-                localOffset = totalSizeInBits + sizeInBit;
+                localOffset = totalSizeInBits - sizeInBit;
                 localIndex = newIndex;
-                while (((existingValue.hash >> (32 - localOffset)) & arrayMask) == ((toAdd.hash >> (32 - localOffset)) & arrayMask))
+                while (((existingValue.hash >> (localOffset)) & arrayMask) == ((toAdd.hash >> (localOffset)) & arrayMask))
                 {
                     var nextLocalIndex = new object[arraySize];
-                    localIndex[((existingValue.hash >> (32 - localOffset)) & arrayMask)] = nextLocalIndex;
+                    localIndex[((existingValue.hash >> (localOffset)) & arrayMask)] = nextLocalIndex;
                     localIndex = nextLocalIndex;
-                    localOffset += sizeInBit;
+                    localOffset -= sizeInBit;
                 }
-                localIndex[(existingValue.hash >> (32 - localOffset)) & arrayMask] = existingValue;
-                localIndex[(toAdd.hash >> (32 - localOffset)) & arrayMask] = toAdd;
-                nextAt = Interlocked.CompareExchange(ref array[(hash >> (32 - totalSizeInBits)) & localOrchard.mask], newIndex, at);
+                localIndex[(existingValue.hash >> (localOffset)) & arrayMask] = existingValue;
+                localIndex[(toAdd.hash >> (localOffset)) & arrayMask] = toAdd;
+                nextAt = Interlocked.CompareExchange(ref localOrchard.items[(hash >> (totalSizeInBits)) & localOrchard.mask], newIndex, at);
                 if (ReferenceEquals(nextAt, at))
                 {
-                    if (Interlocked.Increment(ref count) == orchard.items.Length)
+                    size = targetOrchardSize;
+                    if (Interlocked.Increment(ref count) > (size >> 2))
                     {
-                        Resize();
+                        Resize(size);
                     }
                     return toAdd.value;
                 }
@@ -160,37 +152,41 @@ namespace Prototypist.TaskChain
                 // we actually know this is an array
                 goto WhereToWithToAdd;
             }
+
+            if (at == null)
+            {
+                toAdd = new Value(hash, key, value);
+                if ((at = Interlocked.CompareExchange(ref localOrchard.items[(hash >> (totalSizeInBits)) & localOrchard.mask], toAdd, null)) == null)
+                {
+                    size = targetOrchardSize;
+                    if (Interlocked.Increment(ref count) > (size >> 2))
+                    {
+                        Resize(size);
+                    }
+                    return toAdd.value;
+                }
+                goto WhereToWithToAdd;
+            }
+
+            if (at is object[])
+            {
+                array = new Span<object>(at as object[]);
+                totalSizeInBits -= sizeInBit;
+                at = array[(hash >> (totalSizeInBits)) & arrayMask];
+                goto WhereToOffOrchard;
+            }
+
+            if (at is Memory<object>)
+            {
+                array = ((Memory<object>)at).Span;
+                totalSizeInBits -= sizeInBit;
+                at = array[(hash >> (totalSizeInBits)) & arrayMask];
+                goto WhereToOffOrchard;
+            }
+
             throw new Exception("must be one of those!");
 
         WhereToWithToAdd:
-            if (at is object[])
-            {
-                array = new Span<object>(at as object[]);
-                totalSizeInBits += sizeInBit;
-                at = array[(hash >> (32 - totalSizeInBits)) & arrayMask];
-                goto WhereToOffOrchard;
-            }
-
-            if (at is Memory<object>)
-            {
-                array = ((Memory<object>)at).Span;
-                totalSizeInBits += sizeInBit;
-                at = array[(hash >> (32 - totalSizeInBits)) & arrayMask];
-                goto WhereToOffOrchard;
-            }
-
-            if (at == null)
-            {
-                if ((at = Interlocked.CompareExchange(ref array[(hash >> (32 - totalSizeInBits)) & localOrchard.mask], toAdd, null)) == null)
-                {
-                    if (Interlocked.Increment(ref count) == orchard.items.Length)
-                    {
-                        Resize();
-                    }
-                    return toAdd.value;
-                }
-                goto WhereToWithToAdd;
-            }
 
             if ((existingValue = at as Value) != null)
             {
@@ -199,23 +195,24 @@ namespace Prototypist.TaskChain
                     goto HashMatch;
                 }
                 newIndex = new object[arraySize];
-                localOffset = totalSizeInBits + sizeInBit;
+                localOffset = totalSizeInBits - sizeInBit;
                 localIndex = newIndex;
-                while (((existingValue.hash >> (32 - localOffset)) & arrayMask) == ((toAdd.hash >> (32 - localOffset)) & arrayMask))
+                while (((existingValue.hash >> (localOffset)) & arrayMask) == ((toAdd.hash >> (localOffset)) & arrayMask))
                 {
                     var nextLocalIndex = new object[arraySize];
-                    localIndex[((existingValue.hash >> (32 - localOffset)) & arrayMask)] = nextLocalIndex;
+                    localIndex[((existingValue.hash >> (localOffset)) & arrayMask)] = nextLocalIndex;
                     localIndex = nextLocalIndex;
-                    localOffset += sizeInBit;
+                    localOffset -= sizeInBit;
                 }
-                localIndex[(existingValue.hash >> (32 - localOffset)) & arrayMask] = existingValue;
-                localIndex[(toAdd.hash >> (32 - localOffset)) & arrayMask] = toAdd;
-                nextAt = Interlocked.CompareExchange(ref array[(hash >> (32 - totalSizeInBits)) & localOrchard.mask], newIndex, at);
+                localIndex[(existingValue.hash >> (localOffset)) & arrayMask] = existingValue;
+                localIndex[(toAdd.hash >> (localOffset)) & arrayMask] = toAdd;
+                nextAt = Interlocked.CompareExchange(ref localOrchard.items[(hash >> (totalSizeInBits)) & localOrchard.mask], newIndex, at);
                 if (ReferenceEquals(nextAt, at))
                 {
-                    if (Interlocked.Increment(ref count) == orchard.items.Length)
+                    size = targetOrchardSize;
+                    if (Interlocked.Increment(ref count) > (size >> 2))
                     {
-                        Resize();
+                        Resize(size);
                     }
                     return toAdd.value;
                 }
@@ -224,30 +221,39 @@ namespace Prototypist.TaskChain
                 goto WhereToWithToAdd;
             }
 
+            if (at == null)
+            {
+                if ((at = Interlocked.CompareExchange(ref localOrchard.items[(hash >> (totalSizeInBits)) & localOrchard.mask], toAdd, null)) == null)
+                {
+                    size = targetOrchardSize;
+                    if (Interlocked.Increment(ref count) > (size >> 2))
+                    {
+                        Resize(size);
+                    }
+                    return toAdd.value;
+                }
+                goto WhereToWithToAdd;
+            }
+
+            if (at is object[])
+            {
+                array = new Span<object>(at as object[]);
+                totalSizeInBits -= sizeInBit;
+                at = array[(hash >> (totalSizeInBits)) & arrayMask];
+                goto WhereToOffOrchard;
+            }
+
+            if (at is Memory<object>)
+            {
+                array = ((Memory<object>)at).Span;
+                totalSizeInBits -= sizeInBit;
+                at = array[(hash >> (totalSizeInBits)) & arrayMask];
+                goto WhereToOffOrchard;
+            }
+            
             throw new Exception("must be one of those!");
 
         WhereToOffOrchard:
-            if (at is object[])
-            {
-                array = new Span<object>(at as object[]);
-                totalSizeInBits += sizeInBit;
-                at = array[(hash >> (32 - totalSizeInBits)) & arrayMask];
-                goto WhereToOffOrchard;
-            }
-
-            if (at is Memory<object>)
-            {
-                array = ((Memory<object>)at).Span;
-                totalSizeInBits += sizeInBit;
-                at = array[(hash >> (32 - totalSizeInBits)) & arrayMask];
-                goto WhereToOffOrchard;
-            }
-
-            if (at == null)
-            {
-                goto IsNullOffOrcard;
-            }
-
             if ((existingValue = at as Value) != null)
             {
                 if (existingValue.hash == hash)
@@ -256,31 +262,38 @@ namespace Prototypist.TaskChain
                 }
                 goto IsValueOffOrcard;
             }
-            throw new Exception("this should never happen");
 
+            if (at == null)
+            {
+                goto IsNullOffOrcard;
+            }
 
-        WhereToWithToAddOffOrchard:
             if (at is object[])
             {
                 array = new Span<object>(at as object[]);
-                totalSizeInBits += sizeInBit;
-                at = array[(hash >> (32 - totalSizeInBits)) & arrayMask];
+                totalSizeInBits -= sizeInBit;
+                at = array[(hash >> (totalSizeInBits)) & arrayMask];
                 goto WhereToOffOrchard;
             }
 
             if (at is Memory<object>)
             {
                 array = ((Memory<object>)at).Span;
-                totalSizeInBits += sizeInBit;
-                at = array[(hash >> (32 - totalSizeInBits)) & arrayMask];
+                totalSizeInBits -= sizeInBit;
+                at = array[(hash >> (totalSizeInBits)) & arrayMask];
                 goto WhereToOffOrchard;
             }
 
-            if (at == null)
-            {
-                goto IsNullWithToAddOffOrcard;
+            if (at is PassThrough) {
+                array = ((PassThrough)at).memory.Span;
+                at = array[(hash >> (totalSizeInBits)) & arrayMask];
+                goto WhereToOffOrchard;
             }
 
+            throw new Exception("this should never happen");
+
+
+        WhereToWithToAddOffOrchard:
             if ((existingValue = at as Value) != null)
             {
                 if (existingValue.hash == hash)
@@ -290,16 +303,45 @@ namespace Prototypist.TaskChain
                 goto IsValueWithToAdd;
             }
 
+            if (at == null)
+            {
+                goto IsNullWithToAddOffOrcard;
+            }
+
+            if (at is object[])
+            {
+                array = new Span<object>(at as object[]);
+                totalSizeInBits -= sizeInBit;
+                at = array[(hash >> (totalSizeInBits)) & arrayMask];
+                goto WhereToWithToAddOffOrchard;
+            }
+
+            if (at is Memory<object>)
+            {
+                array = ((Memory<object>)at).Span;
+                totalSizeInBits -= sizeInBit;
+                at = array[(hash >> (totalSizeInBits)) & arrayMask];
+                goto WhereToWithToAddOffOrchard;
+            }
+
+            if (at is PassThrough)
+            {
+                array = ((PassThrough)at).memory.Span;
+                at = array[(hash >> (totalSizeInBits)) & arrayMask];
+                goto WhereToWithToAddOffOrchard;
+            }
+
             throw new Exception("this should never happen");
 
         IsNullOffOrcard:
             toAdd = new Value(hash, key, value);
         IsNullWithToAddOffOrcard:
-            if ((at = Interlocked.CompareExchange(ref array[(hash >> (32 - totalSizeInBits)) & arrayMask], toAdd, null)) == null)
+            if ((at = Interlocked.CompareExchange(ref array[(hash >> (totalSizeInBits)) & arrayMask], toAdd, null)) == null)
             {
-                if (Interlocked.Increment(ref count) == orchard.items.Length)
+                size = targetOrchardSize;
+                if (Interlocked.Increment(ref count) > (size >> 2))
                 {
-                    Resize();
+                    Resize(size);
                 }
                 return toAdd.value;
             }
@@ -309,23 +351,24 @@ namespace Prototypist.TaskChain
             toAdd = new Value(hash, key, value);
         IsValueWithToAdd:
             newIndex = new object[arraySize];
-            localOffset = totalSizeInBits + sizeInBit;
+            localOffset = totalSizeInBits - sizeInBit;
             localIndex = newIndex;
-            while (((existingValue.hash >> (32 - localOffset)) & arrayMask) == ((toAdd.hash >> (32 - localOffset)) & arrayMask))
+            while (((existingValue.hash >> (localOffset)) & arrayMask) == ((toAdd.hash >> (localOffset)) & arrayMask))
             {
                 var nextLocalIndex = new object[arraySize];
-                localIndex[((existingValue.hash >> (32 - localOffset)) & arrayMask)] = nextLocalIndex;
+                localIndex[((existingValue.hash >> (localOffset)) & arrayMask)] = nextLocalIndex;
                 localIndex = nextLocalIndex;
-                localOffset += sizeInBit;
+                localOffset -= sizeInBit;
             }
-            localIndex[(existingValue.hash >> (32 - localOffset)) & arrayMask] = existingValue;
-            localIndex[(toAdd.hash >> (32 - localOffset)) & arrayMask] = toAdd;
-            nextAt = Interlocked.CompareExchange(ref array[(hash >> (32 - totalSizeInBits)) & arrayMask], newIndex, at);
+            localIndex[(existingValue.hash >> (localOffset)) & arrayMask] = existingValue;
+            localIndex[(toAdd.hash >> (localOffset)) & arrayMask] = toAdd;
+            nextAt = Interlocked.CompareExchange(ref array[(hash >> (totalSizeInBits)) & arrayMask], newIndex, at);
             if (ReferenceEquals(nextAt, at))
             {
-                if (Interlocked.Increment(ref count) == orchard.items.Length)
+                size = targetOrchardSize;
+                if (Interlocked.Increment(ref count) > (size >> 2))
                 {
-                    Resize();
+                    Resize(size);
                 }
                 return toAdd.value;
             }
@@ -355,9 +398,10 @@ namespace Prototypist.TaskChain
                     return existingValue.value;
                 }
             }
-            if (Interlocked.Increment(ref count) == orchard.items.Length)
+            size = targetOrchardSize;
+            if (Interlocked.Increment(ref count) > (size >> 2))
             {
-                Resize();
+                Resize(size);
             }
             return toAdd.value;
         }
@@ -369,66 +413,56 @@ namespace Prototypist.TaskChain
                 throw new ArgumentNullException(nameof(key));
             }
 
-            Value existingValue;
+            Span<object> array;
 
             var hash = key.GetHashCode();
 
             var localOrchard = orchard;
-            var array = new Span<object>(localOrchard.items);
-            int totalSizeInBits = localOrchard.sizeInBit;
-            var at = array[(hash >> (32 - totalSizeInBits)) & localOrchard.mask];
+            int totalSizeInBits = 32 - localOrchard.sizeInBit;
+            var at = localOrchard.items[(hash >> (totalSizeInBits)) & localOrchard.mask];
 
         WhereTo:
-            if (at is object[])
-            {
-                array = new Span<object>(at as object[]);
-                totalSizeInBits += sizeInBit;
-                at = array[(hash >> (32 - totalSizeInBits)) & arrayMask];
-                goto WhereTo;
+            switch (at) {
+                case Value existingValue:
+                    if (existingValue.hash == hash)
+                    {
+                        if (existingValue.key.Equals(key))
+                        {
+                            res = existingValue.value;
+                            return true;
+                        }
+                        while (existingValue.next != null)
+                        {
+                            existingValue = existingValue.next;
+                            if (existingValue.key.Equals(key))
+                            {
+                                res = existingValue.value;
+                                return true;
+                            }
+                        }
+                    }
+                    res = default;
+                    return false;
+                case null:
+                    res = default;
+                    return false;
+                case object[] objects:
+                    array = new Span<object>(objects);
+                    totalSizeInBits -= sizeInBit;
+                    at = array[(hash >> (totalSizeInBits)) & arrayMask];
+                    goto WhereTo;
+                case Memory<object> mem:
+                    array = mem.Span;
+                    totalSizeInBits -= sizeInBit;
+                    at = array[(hash >> (totalSizeInBits)) & arrayMask];
+                    goto WhereTo;
+                case PassThrough pass:
+                    array = pass.memory.Span;
+                    at = array[(hash >> (totalSizeInBits)) & arrayMask];
+                    goto WhereTo;
+                default:
+                    throw new Exception("must be one of those!");
             }
-
-            if (at is Memory<object>)
-            {
-                array = ((Memory<object>)at).Span;
-                totalSizeInBits += sizeInBit;
-                at = array[(hash >> (32 - totalSizeInBits)) & arrayMask];
-                goto WhereTo;
-            }
-
-            if (at == null)
-            {
-                res = default;
-                return false;
-            }
-
-            if ((existingValue = at as Value) != null)
-            {
-                if (existingValue.hash == hash)
-                {
-                    goto HashMatch;
-                }
-                res = default;
-                return false;
-            }
-            throw new Exception("must be one of those!");
-
-        HashMatch:
-            if (existingValue.key.Equals(key))
-            {
-                res = existingValue.value;
-                return true;
-            }
-            while (existingValue.next != null)
-            {
-                existingValue = existingValue.next;
-                if (existingValue.key.Equals(key))
-                {
-                    res = existingValue.value;
-                    return true;
-                }
-            }
-            res = default;
-            return false;
         }
 
         private IEnumerable<KeyValuePair<TKey, TValue>> Iterate(object thing)
@@ -488,74 +522,86 @@ namespace Prototypist.TaskChain
         private QueueingConcurrent<int> resizer = new QueueingConcurrent<int>(0);
 
 
-        private void Resize()
+        private void Resize(int size)
         {
-            Task.Run(() =>
+            if (Interlocked.CompareExchange(ref targetOrchardSize, size * arraySize, size) == size)
             {
-                resizer.Act(x =>
+
+                Task.Run(() =>
                 {
-                    var nextOrcard = new object[orchard.items.Length * arraySize];
-                    for (var at = 0; at < orchard.items.Length; at++)
+                    resizer.Act(x =>
                     {
-                        var target = orchard.items[at];
-
-                        if (target is null)
+                        var nextOrcard = new object[orchard.items.Length * arraySize];
+                        for (var at = 0; at < orchard.items.Length; at++)
                         {
-                            var toAdd = new Memory<object>(nextOrcard, at * arraySize, arraySize);
-                            if ((target = Interlocked.CompareExchange(ref orchard.items[at], toAdd, null)) == null)
+                            var target = orchard.items[at];
+
+                            if (target is null)
                             {
-                                continue;
-                            };
-                        }
+                                var toAdd = new Memory<object>(nextOrcard, at * arraySize, arraySize);
+                                target = Interlocked.CompareExchange(ref orchard.items[at], toAdd, null);
+                            }
 
-                        if (target is Value value)
-                        {
-                            var toAdd = new Memory<object>(nextOrcard, at * arraySize, arraySize);
-                            toAdd.Span[(value.hash >> (32 - orchard.sizeInBit - sizeInBit)) & arrayMask] = value;
-                            if ((target = Interlocked.CompareExchange(ref orchard.items[at], toAdd, value)) == value)
+                            if (target is Value value)
                             {
-                                continue;
-                            };
-                        }
+                                var toAdd = new Memory<object>(nextOrcard, at * arraySize, arraySize);
+                                toAdd.Span[(value.hash >> (32 - orchard.sizeInBit - sizeInBit)) & arrayMask] = value;
+                                target = Interlocked.CompareExchange(ref orchard.items[at], toAdd, value);
+                            }
 
-                        if (target is object[] array)
-                        {
-                            for (var j = 0; j < array.Length; j++)
+                            if (target is object[] array)
                             {
-                                var innerTarget = array[j];
-
-                                if (innerTarget is null)
+                                for (var j = 0; j < array.Length; j++)
                                 {
-                                    var toAdd = new object[arraySize];
-                                    innerTarget = Interlocked.CompareExchange(ref array[j], toAdd, null);
-                                }
+                                    var innerTarget = array[j];
 
-                                if (innerTarget is Value innerValue)
-                                {
-                                    var toAdd = new object[arraySize];
-                                    toAdd[(innerValue.hash >> (32 - orchard.sizeInBit - sizeInBit - sizeInBit)) & arrayMask] = innerValue;
-                                    innerTarget = Interlocked.CompareExchange(ref array[j], toAdd, innerValue);
-                                }
+                                    if (innerTarget is null)
+                                    {
+                                        var toAdd = new PassThrough(new Memory<object>(nextOrcard, at * arraySize, arraySize));
+                                        innerTarget = Interlocked.CompareExchange(ref array[j], toAdd, null);
+                                    }
 
-                                if (innerTarget is Memory<object>)
-                                {
-                                    throw new Exception("bug");
-                                }
+                                    if (innerTarget is Value innerValue)
+                                    {
+                                        var toAdd = new PassThrough(new Memory<object>(nextOrcard, at * arraySize, arraySize));
+                                        toAdd.memory.Span[j] = innerValue;
+                                        innerTarget = Interlocked.CompareExchange(ref array[j], toAdd, innerValue);
+                                    }
 
-                                nextOrcard[(at * arraySize) + j] = array[j];
+                                    if (innerTarget is Memory<object>)
+                                    {
+                                        throw new Exception("bug");
+                                    }
+
+                                    if (innerTarget is PassThrough)
+                                    {
+                                        throw new Exception("bug");
+                                    }
+
+                                    if (innerTarget is object[])
+                                    {
+                                        nextOrcard[(at * arraySize) + j] = array[j];
+                                    }
+                                }
+                            }
+
+                            if (target is Memory<object>)
+                            {
+                                throw new Exception("bug");
+                            }
+
+                            if (target is PassThrough)
+                            {
+                                throw new Exception("bug");
                             }
                         }
-
-                        if (target is Memory<object>) {
-                            throw new Exception("bug");
-                        }
-                    }
-                    orchard = new Orchard(nextOrcard, orchard.sizeInBit + sizeInBit, (orchard.mask << sizeInBit) | arrayMask);
-                    return x;
+                        orchard = new Orchard(nextOrcard, orchard.sizeInBit + sizeInBit, (orchard.mask << sizeInBit) | arrayMask);
+                        return x;
+                    });
                 });
-            });
+            }
         }
-        
+
 
         #endregion
 
@@ -678,7 +724,6 @@ namespace Prototypist.TaskChain
 
 
         #endregion
-
     }
 }
 

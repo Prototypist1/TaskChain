@@ -21,8 +21,9 @@ namespace Prototypist.TaskChain.Benchmark
             var summary = BenchmarkRunner.Run<ReadAllItems>();
             Console.WriteLine(summary);
 
-            //foreach (var i in new[] { 10, 100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000 }){
-            //    var tree = new RawConcurrentGrowingIndexedTree2<Guid, string>();
+            //foreach (var i in new[] { 10, 100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000 })
+            //{
+            //    var tree = new RawConcurrentGrowingIndexedTree3<Guid, string>();
             //    var guidList = new List<Guid>();
             //    for (int ii = 0; ii < i; ii++)
             //    {
@@ -32,6 +33,8 @@ namespace Prototypist.TaskChain.Benchmark
             //    {
             //        tree.GetOrAdd(guid, guid.ToString());
             //    }
+
+            //    Task.Delay(1500).Wait();
 
             //    var watch = System.Diagnostics.Stopwatch.StartNew();
             //    Parallel.Invoke(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 }.Select(x =>
@@ -48,7 +51,8 @@ namespace Prototypist.TaskChain.Benchmark
             //    }).ToArray());
 
             //    watch.Stop();
-            //    Console.WriteLine($"reads: {i}, depth per read: {((double)tree.depth)/i}, took: {((double)watch.ElapsedTicks*1_000_000) / (TimeSpan.TicksPerMillisecond* i) }");
+            //    Console.WriteLine($"reads: {i}, took: {((double)watch.ElapsedTicks * 1_000_000) / (TimeSpan.TicksPerMillisecond * i) }");
+            //    Console.WriteLine($"reads: {i}, depth per read: {((double)tree.depth) / i}, took: {((double)watch.ElapsedTicks * 1_000_000) / (TimeSpan.TicksPerMillisecond * i) }");
             //}
 
 

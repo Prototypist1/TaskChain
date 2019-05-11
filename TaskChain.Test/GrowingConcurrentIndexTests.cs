@@ -57,33 +57,6 @@ namespace Prototypist.TaskChain.Test
             }
         }
 
-
-
-        [Fact]
-        public void MemTest() {
-
-            int[] array = new int[100];
-            var memory = new Memory<int>(array);
-
-            var actions = new List<Action>();
-
-            for (int i = 0; i < 100; i++)
-            {
-                var j = i;
-                actions.Add(() =>
-                {
-                    memory.Span[j] = j;
-                });
-            }
-
-            Parallel.Invoke(actions.ToArray());
-            
-            for (int i = 0; i < 100; i++)
-            {
-                Assert.Equal(i, memory.Span[i]);
-            }
-        }
-
         [Fact]
         public void Growing3AddAndGetBack()
         {
@@ -111,18 +84,21 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void Growing3AddAndGetBackParallel()
         {
-            var thing = new RawConcurrentGrowingIndexedTree3<string, string>();
-            var toAdds = new string[100000];
-            for (int i = 0; i < 100000; i++)
+            for (int n = 0; n < 100; n++)
             {
-                toAdds[i] = Guid.NewGuid().ToString();
+                var thing = new RawConcurrentGrowingIndexedTree3<string, string>();
+                var toAdds = new string[100000];
+                for (int i = 0; i < 100000; i++)
+                {
+                    toAdds[i] = Guid.NewGuid().ToString();
+                }
+
+                Parallel.Invoke(toAdds.Select<string, Action>(x =>
+                     () => thing.GetOrAdd(x, x)).ToArray());
+
+                Parallel.Invoke(toAdds.Select<string, Action>(x =>
+                    () => Assert.Equal(x, thing[x])).ToArray());
             }
-
-            Parallel.Invoke(toAdds.Select<string, Action>(x =>
-                 () => thing.GetOrAdd(x, x)).ToArray());
-
-            Parallel.Invoke(toAdds.Select<string, Action>(x =>
-                () => Assert.Equal(x, thing[x])).ToArray());
         }
 
         [Fact]
@@ -147,18 +123,21 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void Growing2AddAndGetBackParallel()
         {
-            var thing = new RawConcurrentGrowingIndexedTree2<string, string>();
-            var toAdds = new string[10000];
-            for (int i = 0; i < 10000; i++)
+            for (int n = 0; n < 100; n++)
             {
-                toAdds[i] = Guid.NewGuid().ToString();
+                var thing = new RawConcurrentGrowingIndexedTree2<string, string>();
+                var toAdds = new string[10000];
+                for (int i = 0; i < 10000; i++)
+                {
+                    toAdds[i] = Guid.NewGuid().ToString();
+                }
+
+                Parallel.Invoke(toAdds.Select<string, Action>(x =>
+                     () => thing.GetOrAdd(x, x)).ToArray());
+
+                Parallel.Invoke(toAdds.Select<string, Action>(x =>
+                    () => Assert.Equal(x, thing[x])).ToArray());
             }
-
-            Parallel.Invoke(toAdds.Select<string, Action>(x =>
-                 () => thing.GetOrAdd(x, x)).ToArray());
-
-            Parallel.Invoke(toAdds.Select<string, Action>(x =>
-                () => Assert.Equal(x, thing[x])).ToArray());
         }
     }
 }

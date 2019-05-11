@@ -11,13 +11,13 @@ namespace Prototypist.TaskChain.Benchmark
     [RPlotExporter, RankColumn]
     public class ReadAllItems
     {
-
-        private RawConcurrentGrowingIndexedTree3<Guid, string> mine;
+        //private ConcurrentDictionary<Guid, string> thing;
+        private RawConcurrentGrowingIndexedTree3<Guid, string> thing;
         private List<List<Guid>> items;
         
         [Params(100,10000,1000000)]
         public int Items;
-        [Params(4)]
+        [Params(1)]
         public int Threads;
         [Params(1)]
         public int sizeInBit;
@@ -26,7 +26,9 @@ namespace Prototypist.TaskChain.Benchmark
         [GlobalSetup]
         public void Setup()
         {
-            mine = new RawConcurrentGrowingIndexedTree3<Guid, string>(sizeInBit);
+            //thing = new ConcurrentDictionary<Guid, string>();
+            thing = new RawConcurrentGrowingIndexedTree3<Guid, string>(sizeInBit);
+
             items = new List<List<Guid>>();
             for (var x = 0; x < Threads; x++)
             {
@@ -34,11 +36,14 @@ namespace Prototypist.TaskChain.Benchmark
                 for (var y = 0; y < Items; y++)
                 {
                     var guid = Guid.NewGuid();
-                    mine.GetOrAdd(guid, guid.ToString());
+                    thing.GetOrAdd(guid, guid.ToString());
                     myList.Add(guid);
                 }
                 items.Add(myList);
             }
+
+            Task.Delay(2000).Wait();
+
         }
 
         [Benchmark]
@@ -48,7 +53,7 @@ namespace Prototypist.TaskChain.Benchmark
             {
                 foreach (var item in items)
                 {
-                    mine.TryGetValue(item, out var _);
+                    thing.TryGetValue(item, out var _);
                 }
             }
 
@@ -69,7 +74,7 @@ namespace Prototypist.TaskChain.Benchmark
                 for (int i = 0; i < 1000; i++)
                 {
                     var guid = Guid.NewGuid();
-                    mine.GetOrAdd(guid, guid.ToString());
+                    thing.GetOrAdd(guid, guid.ToString());
                 }
                 
             }
