@@ -234,6 +234,7 @@ namespace Prototypist.TaskChain
 
             var hash = key.GetHashCode();
 
+
             var localOrchard = orchard;
             var array = localOrchard.items[hash & localOrchard.mask];
             var at = array[(hash >> localOrchard.sizeInBit) & arrayMask];
@@ -250,6 +251,7 @@ namespace Prototypist.TaskChain
             if (at == null)
             {
                 res = default;
+                var db1 = PlacementDebugger();
                 return false;
             }
             if ((existingValue = at as Value) != null)
@@ -259,6 +261,7 @@ namespace Prototypist.TaskChain
                     goto HashMatch;
                 }
                 res = default;
+                var db1 = PlacementDebugger();
                 return false;
             }
             throw new Exception("this should never happen");
@@ -279,6 +282,7 @@ namespace Prototypist.TaskChain
                 }
             }
             res = default;
+            var db = PlacementDebugger();
             return false;
         }
 
@@ -402,7 +406,7 @@ namespace Prototypist.TaskChain
                     {
                         filledIn++;
                         var toAdd = new object[arraySize];
-                        toAdd[(value.hash >> (orchard.sizeInBit + arrayMask)) & arrayMask] = value;
+                        toAdd[(value.hash >> (orchard.sizeInBit + sizeInBit)) & arrayMask] = value;
                         Interlocked.CompareExchange(ref target[i], toAdd, value);
                     }
 

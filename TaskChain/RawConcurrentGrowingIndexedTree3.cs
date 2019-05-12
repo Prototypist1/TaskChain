@@ -413,8 +413,6 @@ namespace Prototypist.TaskChain
                 throw new ArgumentNullException(nameof(key));
             }
 
-            Span<object> array;
-
             var hash = key.GetHashCode();
 
             var localOrchard = orchard;
@@ -422,47 +420,54 @@ namespace Prototypist.TaskChain
             var at = localOrchard.items[(hash >> (totalSizeInBits)) & localOrchard.mask];
 
         WhereTo:
-            switch (at) {
-                case Value existingValue:
-                    if (existingValue.hash == hash)
+
+            if (at is Value existingValue) {
+                if (existingValue.hash == hash)
+                {
+                    if (existingValue.key.Equals(key))
                     {
+                        res = existingValue.value;
+                        return true;
+                    }
+                    while (existingValue.next != null)
+                    {
+                        existingValue = existingValue.next;
                         if (existingValue.key.Equals(key))
                         {
                             res = existingValue.value;
                             return true;
                         }
-                        while (existingValue.next != null)
-                        {
-                            existingValue = existingValue.next;
-                            if (existingValue.key.Equals(key))
-                            {
-                                res = existingValue.value;
-                                return true;
-                            }
-                        }
                     }
-                    res = default;
-                    return false;
-                case null:
-                    res = default;
-                    return false;
-                case object[] objects:
-                    array = new Span<object>(objects);
-                    totalSizeInBits -= sizeInBit;
-                    at = array[(hash >> (totalSizeInBits)) & arrayMask];
-                    goto WhereTo;
-                case Memory<object> mem:
-                    array = mem.Span;
-                    totalSizeInBits -= sizeInBit;
-                    at = array[(hash >> (totalSizeInBits)) & arrayMask];
-                    goto WhereTo;
-                case PassThrough pass:
-                    array = pass.memory.Span;
-                    at = array[(hash >> (totalSizeInBits)) & arrayMask];
-                    goto WhereTo;
-                default:
-                    throw new Exception("must be one of those!");
+                }
+                res = default;
+                return false;
             }
+
+            if (at is null)
+            {
+                res = default;
+                return false;
+            }
+
+            if (at is object[] objects) {
+                totalSizeInBits -= sizeInBit;
+                at = objects[(hash >> (totalSizeInBits)) & arrayMask];
+                goto WhereTo;
+            }
+
+            if (at is Memory<object> mem) {
+                totalSizeInBits -= sizeInBit;
+                at = mem.Span[(hash >> (totalSizeInBits)) & arrayMask];
+                goto WhereTo;
+            }
+
+            if (at is PassThrough pass) {
+                at = pass.memory.Span[(hash >> (totalSizeInBits)) & arrayMask];
+                goto WhereTo;
+            }
+
+            throw new Exception("must be one of those!");
+            
         }
 
         private IEnumerable<KeyValuePair<TKey, TValue>> Iterate(object thing)
@@ -526,80 +531,76 @@ namespace Prototypist.TaskChain
         {
             if (Interlocked.CompareExchange(ref targetOrchardSize, size * arraySize, size) == size)
             {
-
-                Task.Run(() =>
+                resizer.Act(x =>
                 {
-                    resizer.Act(x =>
+                    var nextOrcard = new object[orchard.items.Length * arraySize];
+                    for (var at = 0; at < orchard.items.Length; at++)
                     {
-                        var nextOrcard = new object[orchard.items.Length * arraySize];
-                        for (var at = 0; at < orchard.items.Length; at++)
+                        var target = orchard.items[at];
+
+                        if (target is null)
                         {
-                            var target = orchard.items[at];
+                            var toAdd = new Memory<object>(nextOrcard, at * arraySize, arraySize);
+                            target = Interlocked.CompareExchange(ref orchard.items[at], toAdd, null);
+                        }
 
-                            if (target is null)
-                            {
-                                var toAdd = new Memory<object>(nextOrcard, at * arraySize, arraySize);
-                                target = Interlocked.CompareExchange(ref orchard.items[at], toAdd, null);
-                            }
+                        if (target is Value value)
+                        {
+                            var toAdd = new Memory<object>(nextOrcard, at * arraySize, arraySize);
+                            toAdd.Span[(value.hash >> (32 - orchard.sizeInBit - sizeInBit)) & arrayMask] = value;
+                            target = Interlocked.CompareExchange(ref orchard.items[at], toAdd, value);
+                        }
 
-                            if (target is Value value)
+                        if (target is object[] array)
+                        {
+                            for (var j = 0; j < array.Length; j++)
                             {
-                                var toAdd = new Memory<object>(nextOrcard, at * arraySize, arraySize);
-                                toAdd.Span[(value.hash >> (32 - orchard.sizeInBit - sizeInBit)) & arrayMask] = value;
-                                target = Interlocked.CompareExchange(ref orchard.items[at], toAdd, value);
-                            }
+                                var innerTarget = array[j];
 
-                            if (target is object[] array)
-                            {
-                                for (var j = 0; j < array.Length; j++)
+                                if (innerTarget is null)
                                 {
-                                    var innerTarget = array[j];
+                                    var toAdd = new PassThrough(new Memory<object>(nextOrcard, at * arraySize, arraySize));
+                                    innerTarget = Interlocked.CompareExchange(ref array[j], toAdd, null);
+                                }
 
-                                    if (innerTarget is null)
-                                    {
-                                        var toAdd = new PassThrough(new Memory<object>(nextOrcard, at * arraySize, arraySize));
-                                        innerTarget = Interlocked.CompareExchange(ref array[j], toAdd, null);
-                                    }
+                                if (innerTarget is Value innerValue)
+                                {
+                                    var toAdd = new PassThrough(new Memory<object>(nextOrcard, at * arraySize, arraySize));
+                                    toAdd.memory.Span[j] = innerValue;
+                                    innerTarget = Interlocked.CompareExchange(ref array[j], toAdd, innerValue);
+                                }
 
-                                    if (innerTarget is Value innerValue)
-                                    {
-                                        var toAdd = new PassThrough(new Memory<object>(nextOrcard, at * arraySize, arraySize));
-                                        toAdd.memory.Span[j] = innerValue;
-                                        innerTarget = Interlocked.CompareExchange(ref array[j], toAdd, innerValue);
-                                    }
+                                if (innerTarget is Memory<object>)
+                                {
+                                    throw new Exception("bug");
+                                }
 
-                                    if (innerTarget is Memory<object>)
-                                    {
-                                        throw new Exception("bug");
-                                    }
+                                if (innerTarget is PassThrough)
+                                {
+                                    throw new Exception("bug");
+                                }
 
-                                    if (innerTarget is PassThrough)
-                                    {
-                                        throw new Exception("bug");
-                                    }
-
-                                    if (innerTarget is object[])
-                                    {
-                                        nextOrcard[(at * arraySize) + j] = array[j];
-                                    }
+                                if (innerTarget is object[])
+                                {
+                                    nextOrcard[(at * arraySize) + j] = array[j];
                                 }
                             }
-
-                            if (target is Memory<object>)
-                            {
-                                throw new Exception("bug");
-                            }
-
-                            if (target is PassThrough)
-                            {
-                                throw new Exception("bug");
-                            }
                         }
-                        orchard = new Orchard(nextOrcard, orchard.sizeInBit + sizeInBit, (orchard.mask << sizeInBit) | arrayMask);
-                        return x;
-                    });
+
+                        if (target is Memory<object>)
+                        {
+                            throw new Exception("bug");
+                        }
+
+                        if (target is PassThrough)
+                        {
+                            throw new Exception("bug");
+                        }
+                    }
+                    orchard = new Orchard(nextOrcard, orchard.sizeInBit + sizeInBit, (orchard.mask << sizeInBit) | arrayMask);
+                    return x;
                 });
-            }
+            }  
         }
 
 

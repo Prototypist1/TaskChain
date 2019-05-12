@@ -18,7 +18,23 @@ namespace Prototypist.TaskChain.Benchmark
         static void Main(string[] _)
         {
 
-            var summary = BenchmarkRunner.Run<ReadAllItems>();
+            //var thing = new RawConcurrentGrowingIndexedTree3<SimpleHash, string>(2);
+            //var simpleHash0 = new SimpleHash(0b_0000_00_00_00_00_00_00_00_00_00_00_00_00_00_00);
+            //thing.GetOrAdd(simpleHash0, "0-0");
+
+            //var simpleHash1 = new SimpleHash(0b_0001_01_00_00_00_00_00_00_00_00_00_00_00_00_00);
+            //thing.GetOrAdd(new SimpleHash(0b_0001_00_00_00_00_00_00_00_00_00_00_00_00_00_00), "1-0");
+            //thing.GetOrAdd(simpleHash1, "1-1");
+
+
+            //var simpleHash2 = new SimpleHash(0b_0010_10_00_00_00_00_00_00_00_00_00_00_00_00_00);
+            //thing.GetOrAdd(new SimpleHash(0b_0010_00_00_00_00_00_00_00_00_00_00_00_00_00_00), "2-0");
+            //thing.GetOrAdd(new SimpleHash(0b_0010_01_00_00_00_00_00_00_00_00_00_00_00_00_00), "2-1");
+            //thing.GetOrAdd(simpleHash2, "1-2");
+
+            //var db = 0;
+
+            var summary = BenchmarkRunner.Run<HashCollisionTest>();
             Console.WriteLine(summary);
 
             //foreach (var i in new[] { 10, 100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000 })

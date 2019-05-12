@@ -89,6 +89,134 @@ namespace Prototypist.TaskChain.Benchmark
         }
     }
 
+
+    [RPlotExporter, RankColumn]
+    public class HashCollisionTest
+    {
+        private RawConcurrentGrowingIndexedTree3<SimpleHash, string> thing;
+        private SimpleHash simpleHash0, simpleHash1, simpleHash2, simpleHashNot;
+
+        [GlobalSetup]
+        public void Setup()
+        {
+            thing = new RawConcurrentGrowingIndexedTree3<SimpleHash, string>(2);
+            simpleHash0 = new SimpleHash(0b_0000_00_00_00_00_00_00_00_00_00_00_00_00_00_00);
+            thing.GetOrAdd(simpleHash0, "0-0");
+
+            simpleHash1 = new SimpleHash(0b_0001_01_00_00_00_00_00_00_00_00_00_00_00_00_00);
+            thing.GetOrAdd(new SimpleHash(0b_0001_00_00_00_00_00_00_00_00_00_00_00_00_00_00), "1-0");
+            thing.GetOrAdd(simpleHash1, "1-1");
+
+            simpleHashNot = new SimpleHash(0b_0010_01_00_01_00_00_10_00_00_00_00_00_00_00_00);
+
+            //simpleHash2 = new SimpleHash(0b_0010_10_00_00_00_00_00_00_00_00_00_00_00_00_00);
+            //thing.GetOrAdd(new SimpleHash(0b_0010_00_00_00_00_00_00_00_00_00_00_00_00_00_00), "2-0");
+            //thing.GetOrAdd(new SimpleHash(0b_0010_01_00_00_00_00_00_00_00_00_00_00_00_00_00), "2-1");
+            //thing.GetOrAdd(simpleHash2, "1-2");
+        }
+
+        [Benchmark]
+        public void SameBucket2()
+        {
+            thing.TryGetValue(simpleHash1, out var _);
+        }
+
+        [Benchmark]
+        public void NotThere()
+        {
+            thing.TryGetValue(simpleHashNot, out var _);
+        }
+
+        //[Benchmark]
+        //public void SameBucket3()
+        //{
+        //    thing.TryGetValue(simpleHash2, out var _);
+        //}
+
+        [Benchmark]
+        public void Single()
+        {
+            thing.TryGetValue(simpleHash0, out var _);
+        }
+
+
+
+
+    }
+
+    [RPlotExporter, RankColumn]
+    public class HashCollisionTestSystem
+    {
+        private ConcurrentDictionary<SimpleHash, string> thing;
+        private SimpleHash simpleHash0;
+        private SimpleHash simpleHash1, simpleHashNot;
+
+        [GlobalSetup]
+        public void Setup()
+        {
+            thing = new ConcurrentDictionary<SimpleHash, string>();
+            simpleHash0 = new SimpleHash(0);
+            thing.GetOrAdd(simpleHash0, "0-0");
+
+            simpleHash1 = new SimpleHash(1);
+            thing.GetOrAdd(simpleHash1, "1-18");
+            for (int i = 0; i < 1; i++)
+            {
+                thing.GetOrAdd(new SimpleHash(1), Guid.NewGuid().ToString());
+            }
+
+            simpleHashNot = new SimpleHash(2);
+
+            //thing.GetOrAdd(new SimpleHash((31*19)+5), "1-19");
+            //thing.GetOrAdd(new SimpleHash((31*20)+5), "1-20");
+            //thing.GetOrAdd(new SimpleHash((31*21)+5), "1-21");
+            //thing.GetOrAdd(new SimpleHash((31*22)+5), "1-22");
+            //thing.GetOrAdd(new SimpleHash((31*23)+5), "1-23");
+            //thing.GetOrAdd(new SimpleHash((31*24)+5), "1-24");
+            //thing.GetOrAdd(new SimpleHash((31*25)+5), "1-25");
+            //thing.GetOrAdd(new SimpleHash((31*26)+5), "1-26");
+            //thing.GetOrAdd(new SimpleHash((31*27)+5), "1-27");
+            //thing.GetOrAdd(new SimpleHash((31*28)+5), "1-28");
+            //thing.GetOrAdd(new SimpleHash((31*29)+5), "1-29");
+            //thing.GetOrAdd(new SimpleHash((31*30)+5), "1-30");
+            //thing.GetOrAdd(new SimpleHash((31*31)+5), "1-31");
+        }
+
+        [Benchmark]
+        public void SameBucket2()
+        {
+
+            thing.TryGetValue(simpleHash1, out var _);
+        }
+
+        [Benchmark]
+        public void NotThere()
+        {
+            thing.TryGetValue(simpleHashNot, out var _);
+        }
+
+        [Benchmark]
+        public void Single()
+        {
+            thing.TryGetValue(simpleHash0, out var _);
+        }
+
+    }
+
+    public class SimpleHash {
+        private readonly int hash;
+
+        public SimpleHash(int hash)
+        {
+            this.hash = hash;
+        }
+
+        public override int GetHashCode()
+        {
+            return hash;
+        }
+    }
+
     public class InterlockedTest {
 
         [Params(4)]
