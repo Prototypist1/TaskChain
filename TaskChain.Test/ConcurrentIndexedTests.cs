@@ -11,19 +11,19 @@ namespace Prototypist.TaskChain.Test
     {
         [Theory]
         [InlineData(1)]
-        public async Task AddUpdate(int i)
+        public void AddUpdate(int i)
         {
             var thing = new ConcurrentIndexed<int, string>();
 
-            await thing.DoOrAdd(i, (s) => s + " world", "hello");
+            thing.DoOrAdd(i, (s) => s + " world", "hello");
             Assert.Equal("hello", thing.GetOrThrow(i));
-            await thing.DoOrAdd(i, (s) => s + " world", "hello");
+            thing.DoOrAdd(i, (s) => s + " world", "hello");
             Assert.Equal("hello world", thing.GetOrThrow(i));
         }
 
         [Theory]
         [InlineData(1)]
-        public async Task AddUpdateOrThrow(int i)
+        public void AddUpdateOrThrow(int i)
         {
             var thing = new ConcurrentIndexed<int, string>();
 
@@ -35,7 +35,7 @@ namespace Prototypist.TaskChain.Test
 
             });
 
-            await thing.UpdateOrThrow(i, (s) => s + " world");
+            thing.UpdateOrThrow(i, (s) => s + " world");
             Assert.Equal("hello world", thing.GetOrThrow(i));
         }
 
@@ -51,11 +51,11 @@ namespace Prototypist.TaskChain.Test
 
         [Theory]
         [InlineData(1)]
-        public async Task UpdateFallback(int i)
+        public void UpdateFallback(int i)
         {
             var thing = new ConcurrentIndexed<int, string>();
 
-            Assert.Equal("not hello", await thing.DoOrAdd(i, (x) => x + " world", "not hello"));
+            Assert.Equal("not hello", thing.DoOrAdd(i, (x) => x + " world", "not hello"));
             Assert.Equal("not hello", thing.GetOrThrow(i));
         }
 
@@ -119,41 +119,41 @@ namespace Prototypist.TaskChain.Test
         }
 
         [Fact]
-        public async Task SetOrThrow()
+        public void SetOrThrow()
         {
             var target = new ConcurrentIndexed<int, string>();
 
-            await Assert.ThrowsAnyAsync<Exception>(async () => await target.UpdateOrThrow(1, "1"));
+            Assert.ThrowsAny<Exception>(() => target.UpdateOrThrow(1, "1"));
 
             target.AddOrThrow(1, "1");
-            await target.UpdateOrThrow(1, "1-1");
+            target.UpdateOrThrow(1, "1-1");
 
             Assert.Equal("1-1", target.GetOrThrow(1));
         }
 
         [Fact]
-        public async Task DoOrThrow()
+        public void DoOrThrow()
         {
             var target = new ConcurrentIndexed<int, string>();
 
-            await Assert.ThrowsAnyAsync<Exception>(async () => await target.DoOrThrow(1, x => x + "!"));
+            Assert.ThrowsAny<Exception>(() => target.DoOrThrow(1, x => x + "!"));
 
             target.AddOrThrow(1, "1");
-            await target.DoOrThrow(1, x => x + "!");
+            target.DoOrThrow(1, x => x + "!");
 
             Assert.Equal("1!", target.GetOrThrow(1));
         }
 
         [Fact]
-        public async Task DoOrThrow_Func()
+        public void DoOrThrow_Func()
         {
             var target = new ConcurrentIndexed<int, string>();
 
-            await Assert.ThrowsAnyAsync<Exception>(async () => await target.DoOrThrow(1, x => x + "!"));
+            Assert.ThrowsAny<Exception>(() => target.DoOrThrow(1, x => x + "!"));
 
             target.AddOrThrow(1, "1");
             string s = null;
-            await target.DoOrThrow(1, x => {
+            target.DoOrThrow(1, x => {
                 s = x + "!";
                 return x;
             });
@@ -223,14 +223,38 @@ namespace Prototypist.TaskChain.Test
 
 
         [Fact]
-        public async Task UpdateOrThrow()
+        public void UpdateOrThrow()
         {
             var target = new ConcurrentIndexed<int, string>();
 
-            await Assert.ThrowsAnyAsync<Exception>(async () => await target.UpdateOrThrow(1, x => x + "!"));
+            Assert.ThrowsAny<Exception>(() => target.UpdateOrThrow(1, x => x + "!"));
             target.Set(1, "1");
-            Assert.Equal("1!", await target.UpdateOrThrow(1, x => x + "!"));
+            Assert.Equal("1!", target.UpdateOrThrow(1, x => x + "!"));
         }
-        
+
+
+        [Fact]
+        public void DoubleIterate()
+        {
+            for (int k = 0; k < 1000; k++)
+            {
+                var student = new ConcurrentIndexed<int,int>();
+                for (int i = 0; i < 10; i++)
+                {
+                    student.GetOrAdd(i, i);
+                }
+                var count = 0;
+
+                foreach (var x in student)
+                {
+                    foreach (var y in student)
+                    {
+                        count++;
+                    }
+                }
+                Assert.Equal(100, count);
+            }
+        }
+
     }
 }

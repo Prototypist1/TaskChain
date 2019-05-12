@@ -480,9 +480,31 @@ namespace Prototypist.TaskChain
 
             if (thing is object[] things)
             {
-                foreach (var item in Iterate(things))
+                foreach (var item in things)
+                {
+                    foreach (var innerItem in Iterate(item))
+                    {
+                        yield return innerItem;
+                    }
+                }
+            }
+
+            if (thing is PassThrough passThrough)
+            {
+                foreach (var item in Iterate(passThrough.memory))
                 {
                     yield return item;
+                }
+            }
+
+            if (thing is Memory<object> memory)
+            {
+                for (int i = 0; i < memory.Span.Length; i++)
+                {
+                    foreach (var innerItem in Iterate(memory.Span[i]))
+                    {
+                        yield return innerItem;
+                    }
                 }
             }
         }
