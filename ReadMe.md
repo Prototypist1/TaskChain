@@ -18,7 +18,7 @@ It fills a few holes in `System.Collections.Generic`. Specifically, it has a thr
 
 * **`QueueingConcurrent<T>`** - Makes an object thread safe by queing code that modify it.
 
-* **`RawConcurrentIndexed`** - Extremely light version of `ConcurrentIndex`. `RawConcurrentIndexed` Is read only and does not provide `Count`. 
+* **`RawConcurrentIndexed`** - Extremely light version of `ConcurrentIndex`. `RawConcurrentIndexed` Is add only. 
 Enumeration is safe but might not include items added during enumeration.
 
 * **`RawConcurrentArrayList`** - Extremely light version of `ConcurrentArrayList`. `RawConcurrentArrayList` does not support `Set` and 
