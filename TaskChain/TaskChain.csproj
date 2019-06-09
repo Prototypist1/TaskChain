@@ -6,12 +6,14 @@
     <Product>Prototypist.TaskChain</Product>
     <Description>Task Chain is a set of lockless thread safe data structures</Description>
     <PackageId>Prototypist.TaskChain</PackageId>
-    <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
-    <PackageReleaseNotes>Initial release</PackageReleaseNotes>
-    <Version>1.0.0</Version>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageReleaseNotes></PackageReleaseNotes>
+    <Version>1.0.3</Version>
     <PackageRequireLicenseAcceptance>False</PackageRequireLicenseAcceptance>
     <Company>Prototypist.TaskChain</Company>
     <Authors>Prototypist.TaskChain</Authors>
+    <AssemblyVersion>1.0.3.0</AssemblyVersion>
+    <FileVersion>1.0.3.0</FileVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
