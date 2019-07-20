@@ -42,6 +42,29 @@ namespace Prototypist.TaskChain
             }
         }
 
+        public bool TryGetFirst(out TValue first)
+        {
+            var target = BoforeStart.next;
+            if (target == null) {
+                first = default;
+                return false;
+            }
+            first = target.Value;
+            return true;
+        }
+
+        public bool TryGetLast(out TValue last)
+        {
+            var target = endOfChain;
+            if (target == null)
+            {
+                last = default;
+                return false;
+            }
+            last = target.Value;
+            return true;
+        }
+
         private Link Get(int i) {
             if (i < 0) {
                 throw new IndexOutOfRangeException($"index: {i} is not expected to be to be less than 0");

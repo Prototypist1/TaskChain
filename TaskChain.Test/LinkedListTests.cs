@@ -46,8 +46,6 @@ namespace Prototypist.TaskChain.Test
                 Assert.Equal(toAdd - removed, subject.Count());
 
             }
-
         }
-
     }
 }
