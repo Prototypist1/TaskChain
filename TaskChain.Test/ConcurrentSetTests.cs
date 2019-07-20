@@ -1,5 +1,4 @@
-﻿using Prototypist.TaskChain.DataTypes;
-using System;
+﻿using System;
 using Xunit;
 
 namespace Prototypist.TaskChain.Test

@@ -1,5 +1,4 @@
 ﻿using BenchmarkDotNet.Attributes;
-using Prototypist.TaskChain.DataTypes;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -12,7 +11,7 @@ namespace Prototypist.TaskChain.Benchmark
     public class ReadAllItems
     {
         //private ConcurrentDictionary<Guid, string> thing;
-        private RawConcurrentGrowingIndexedTree3<Guid, string> thing;
+        private RawConcurrentIndexed<Guid, string> thing;
         private List<List<Guid>> items;
         
         [Params(100,10000,1000000)]
@@ -27,7 +26,7 @@ namespace Prototypist.TaskChain.Benchmark
         public void Setup()
         {
             //thing = new ConcurrentDictionary<Guid, string>();
-            thing = new RawConcurrentGrowingIndexedTree3<Guid, string>(sizeInBit);
+            thing = new RawConcurrentIndexed<Guid, string>(sizeInBit);
 
             items = new List<List<Guid>>();
             for (var x = 0; x < Threads; x++)
@@ -93,13 +92,13 @@ namespace Prototypist.TaskChain.Benchmark
     [RPlotExporter, RankColumn]
     public class HashCollisionTest
     {
-        private RawConcurrentGrowingIndexedTree3<SimpleHash, string> thing;
+        private RawConcurrentIndexed<SimpleHash, string> thing;
         private SimpleHash simpleHash0, simpleHash1, simpleHash2, simpleHashNot;
 
         [GlobalSetup]
         public void Setup()
         {
-            thing = new RawConcurrentGrowingIndexedTree3<SimpleHash, string>(2);
+            thing = new RawConcurrentIndexed<SimpleHash, string>(2);
             simpleHash0 = new SimpleHash(0b_0000_00_00_00_00_00_00_00_00_00_00_00_00_00_00);
             thing.GetOrAdd(simpleHash0, "0-0");
 
@@ -343,9 +342,9 @@ namespace Prototypist.TaskChain.Benchmark
     public class WriteAllItems
     {
 
-        private RawConcurrentIndexed<Guid, Guid> origninal;
-        private RawConcurrentGrowingIndex<Guid, Guid> growning;
-        private RawConcurrentIndexedTree<Guid, Guid> tree;
+        //private RawConcurrentIndexed<Guid, Guid> origninal;
+        private RawConcurrentIndexed<Guid, Guid> growning;
+        //private RawConcurrentIndexedTree<Guid, Guid> tree;
         private ConcurrentDictionary<Guid, Guid> concurrentDictionary;
 
         
@@ -357,31 +356,31 @@ namespace Prototypist.TaskChain.Benchmark
         [GlobalSetup]
         public void Setup()
         {
-            tree = new RawConcurrentIndexedTree<Guid, Guid>();
-            growning = new RawConcurrentGrowingIndex<Guid, Guid>();
+            //tree = new RawConcurrentIndexedTree<Guid, Guid>();
+            growning = new RawConcurrentIndexed<Guid, Guid>();
             concurrentDictionary = new ConcurrentDictionary<Guid, Guid>();
-            origninal = new RawConcurrentIndexed<Guid, Guid>();
+            //origninal = new RawConcurrentIndexed<Guid, Guid>();
         }
 
-        private void AddToOriginal()
-        {
-            for (var i = 0; i < Items; i++)
-            {
-                origninal.GetOrAdd(new RawConcurrentIndexed<Guid, Guid>.KeyValue( Guid.NewGuid(), Guid.NewGuid()));
-            }
-        }
+        //private void AddToOriginal()
+        //{
+        //    for (var i = 0; i < Items; i++)
+        //    {
+        //        origninal.GetOrAdd(new RawConcurrentIndexed<Guid, Guid>.KeyValue( Guid.NewGuid(), Guid.NewGuid()));
+        //    }
+        //}
 
         //[Benchmark]
-        public void Original()
-        {
-            var actions = new List<Action>();
-            for (int i = 0; i < Threads; i++)
-            {
-                actions.Add(AddToOriginal);
-            }
+        //public void Original()
+        //{
+        //    var actions = new List<Action>();
+        //    for (int i = 0; i < Threads; i++)
+        //    {
+        //        actions.Add(AddToOriginal);
+        //    }
 
-            Parallel.Invoke(actions.ToArray());
-        }
+        //    Parallel.Invoke(actions.ToArray());
+        //}
 
         private void AddToGrowing()
         {
@@ -405,25 +404,25 @@ namespace Prototypist.TaskChain.Benchmark
         }
 
 
-        private void AddToTree() {
-            for (var i = 0; i < Items; i++)
-            {
-                tree.GetOrAdd(Guid.NewGuid(), Guid.NewGuid());
-            }
-        }
+        //private void AddToTree() {
+        //    for (var i = 0; i < Items; i++)
+        //    {
+        //        tree.GetOrAdd(Guid.NewGuid(), Guid.NewGuid());
+        //    }
+        ////}
 
-        [Benchmark]
-        public void Tree()
-        {
-            var actions = new List<Action>();
-            for (int i = 0; i < Threads; i++)
-            {
-                actions.Add(AddToTree);
-            }
+        //[Benchmark]
+        //public void Tree()
+        //{
+        //    var actions = new List<Action>();
+        //    for (int i = 0; i < Threads; i++)
+        //    {
+        //        actions.Add(AddToTree);
+        //    }
 
-            Parallel.Invoke(actions.ToArray());
+        //    Parallel.Invoke(actions.ToArray());
 
-        }
+        //}
 
         private void AddToConcurrentDictionary()
         {

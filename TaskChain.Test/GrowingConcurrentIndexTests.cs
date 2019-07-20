@@ -11,7 +11,7 @@ namespace Prototypist.TaskChain.Test
     {
         [Fact]
         public void Add() {
-            var thing = new RawConcurrentGrowingIndex<string, string>();
+            var thing = new RawConcurrentIndexed<string, string>();
             var str = Guid.NewGuid().ToString();
             thing.GetOrAdd(str, str);
 
@@ -21,9 +21,9 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void AddAndGetBack()
         {
-            var thing = new RawConcurrentIndexedTree<string, string>();
+            var thing = new RawConcurrentIndexed<string, string>();
             var toAdds = new string[1000];
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < toAdds.Length; i++)
             {
                 toAdds[i] = Guid.NewGuid().ToString();
             }
@@ -41,9 +41,9 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void GrowingAddAndGetBack()
         {
-            var thing = new RawConcurrentGrowingIndexedTree<string, string>();
+            var thing = new RawConcurrentIndexed<string, string>();
             var toAdds = new string[1000];
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < toAdds.Length; i++)
             {
                 toAdds[i] = Guid.NewGuid().ToString();
             }
@@ -63,7 +63,7 @@ namespace Prototypist.TaskChain.Test
             for (int k = 0; k < 100; k++)
             {
 
-                var thing = new RawConcurrentGrowingIndexedTree3<string, string>();
+                var thing = new RawConcurrentIndexed<string, string>();
                 var toAdds = new string[1000];
                 for (int i = 0; i < 1000; i++)
                 {
@@ -86,9 +86,9 @@ namespace Prototypist.TaskChain.Test
         {
             for (int n = 0; n < 100; n++)
             {
-                var thing = new RawConcurrentGrowingIndexedTree3<string, string>();
-                var toAdds = new string[100000];
-                for (int i = 0; i < 100000; i++)
+                var thing = new RawConcurrentIndexed<string, string>();
+                var toAdds = new string[10000];
+                for (int i = 0; i < toAdds.Length; i++)
                 {
                     toAdds[i] = Guid.NewGuid().ToString();
                 }
@@ -104,9 +104,9 @@ namespace Prototypist.TaskChain.Test
         [Fact]
         public void Growing2AddAndGetBack()
         {
-            var thing = new RawConcurrentGrowingIndexedTree2<string, string>();
+            var thing = new RawConcurrentIndexed<string, string>();
             var toAdds = new string[1000];
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < toAdds.Length; i++)
             {
                 toAdds[i] = Guid.NewGuid().ToString();
             }
@@ -125,9 +125,9 @@ namespace Prototypist.TaskChain.Test
         {
             for (int n = 0; n < 100; n++)
             {
-                var thing = new RawConcurrentGrowingIndexedTree2<string, string>();
+                var thing = new RawConcurrentIndexed<string, string>();
                 var toAdds = new string[10000];
-                for (int i = 0; i < 10000; i++)
+                for (int i = 0; i < toAdds.Length; i++)
                 {
                     toAdds[i] = Guid.NewGuid().ToString();
                 }

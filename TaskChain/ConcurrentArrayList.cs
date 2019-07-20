@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 
-namespace Prototypist.TaskChain.DataTypes
+namespace Prototypist.TaskChain
 {
     public class ConcurrentArrayList<TValue> : IReadOnlyList<TValue>
     {

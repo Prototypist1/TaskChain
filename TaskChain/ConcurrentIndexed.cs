@@ -7,12 +7,12 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Prototypist.TaskChain.DataTypes
+namespace Prototypist.TaskChain
 {
 
     public class ConcurrentIndexed<TKey, TValue> : IReadOnlyDictionary<TKey, TValue>
     {
-        private readonly RawConcurrentGrowingIndexedTree3<TKey, JumpBallConcurrent<TValue>> backing = new RawConcurrentGrowingIndexedTree3<TKey, JumpBallConcurrent<TValue>>();
+        private readonly RawConcurrentIndexed<TKey, JumpBallConcurrent<TValue>> backing = new RawConcurrentIndexed<TKey, JumpBallConcurrent<TValue>>();
         private const long enumerationAdd = 1_000_000_000;
         private long enumerationCount = 0;
 

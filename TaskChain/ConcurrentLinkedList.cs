@@ -7,13 +7,14 @@ namespace Prototypist.TaskChain
 {
     public class ConcurrentLinkedList<TValue> : IReadOnlyList<TValue>
     {
-        protected volatile Link startOfChain;
-        protected volatile Link endOfChain = new Link();
+        protected Link BoforeStart = new Link();
+        protected volatile Link endOfChain;
         private int count = 0;
 
-        //protected class Link {
-
-        //} 
+        public ConcurrentLinkedList()
+        {
+            endOfChain = BoforeStart;
+        }
 
         protected class Link
         {
@@ -45,7 +46,7 @@ namespace Prototypist.TaskChain
             if (i < 0) {
                 throw new IndexOutOfRangeException($"index: {i} is not expected to be to be less than 0");
             }
-            var at = startOfChain;
+            var at = BoforeStart.next;
             var myIndex = 0;
             while (true) { 
                 if (myIndex == i) {
@@ -77,9 +78,6 @@ namespace Prototypist.TaskChain
                 {
                     endOfChain = endOfChain.next;
                     Interlocked.Increment(ref count);
-                    // when adding two items an empty list
-                    // the second one could be the first to claim the "start of chain"
-                    Interlocked.CompareExchange(ref startOfChain, link, null);
                     return;
                 }
             }
@@ -88,20 +86,22 @@ namespace Prototypist.TaskChain
         public bool RemoveStart() {
             while (true)
             {
-                var myStartOfChain = startOfChain;
-                if (myStartOfChain == null) {
+                var toRemove = BoforeStart;
+                if (toRemove.next == null)
+                {
                     return false;
                 }
-                if (Interlocked.CompareExchange(ref startOfChain, myStartOfChain.next, myStartOfChain) == myStartOfChain) {
+                if (Interlocked.CompareExchange(ref BoforeStart, toRemove.next, toRemove) == toRemove)
+                {
                     Interlocked.Decrement(ref count);
-                    
+
                     return true;
                 }
             }
         }
 
         public IEnumerator<TValue> GetEnumerator() {
-            var at = startOfChain;
+            var at = BoforeStart.next;
             if (at != null) {
                 yield return at.Value;
                 while (at.next != null) {

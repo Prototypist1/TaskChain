@@ -1,5 +1,4 @@
 ﻿using BenchmarkDotNet.Attributes;
-using Prototypist.TaskChain.DataTypes;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;

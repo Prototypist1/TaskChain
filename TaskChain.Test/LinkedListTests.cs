@@ -13,7 +13,7 @@ namespace Prototypist.TaskChain.Test
 
         [Fact]
         public void AddRemoveAndCount() {
-            for (int i = 0; i < 100000; i++)
+            for (int i = 0; i < 10000; i++)
             {
                 var random = new Random();
                 var removed = 0;
@@ -43,6 +43,7 @@ namespace Prototypist.TaskChain.Test
                 Parallel.Invoke( actions.OrderBy(x => random.NextDouble()).ToArray());
 
                 Assert.Equal(toAdd-removed,subject.Count);
+                Assert.Equal(toAdd - removed, subject.Count());
 
             }
 

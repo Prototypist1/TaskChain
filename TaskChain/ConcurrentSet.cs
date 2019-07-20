@@ -4,11 +4,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 
-namespace Prototypist.TaskChain.DataTypes
+namespace Prototypist.TaskChain
 {
 
     public class ConcurrentSet<T> : IReadOnlyCollection<T>
     {
+
         private readonly RawConcurrentIndexed<T, T> backing = new RawConcurrentIndexed<T, T>();
         private const long enumerationAdd = 1_000_000_000;
         private long enumerationCount = 0;
@@ -36,7 +37,7 @@ namespace Prototypist.TaskChain.DataTypes
             {
                 NoModificationDuringEnumeration();
 
-                return backing.GetOrAdd(new RawConcurrentIndexed<T,T>.KeyValue(value, value)).value;
+                return backing.GetOrAdd(value, value);
             }
             finally
             {
@@ -50,9 +51,8 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new RawConcurrentIndexed<T, T>.KeyValue(value, value);
-                var res = backing.GetOrAdd(toAdd);
-                if (!object.ReferenceEquals(res, toAdd))
+                var res = backing.TryAdd(value, value);
+                if (!res)
                 {
                     throw new Exception("Item already added");
                 }
@@ -68,9 +68,7 @@ namespace Prototypist.TaskChain.DataTypes
             try
             {
                 NoModificationDuringEnumeration();
-                var toAdd = new RawConcurrentIndexed<T, T>.KeyValue(value, value);
-                var res = backing.GetOrAdd(toAdd);
-                return ReferenceEquals(res, toAdd);
+                return backing.TryAdd(value, value);
             }
             finally
             {
