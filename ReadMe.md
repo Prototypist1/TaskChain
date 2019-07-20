@@ -18,6 +18,8 @@ It fills a few holes in `System.Collections.Generic`. Specifically, it has a thr
 
 * **`QueueingConcurrent<T>`** - Makes an object thread safe by queing code that modify it.
 
+* **`JumpBallConcurrent<T>`** - Makes an object thread safe by retrying until the lock is achieved.
+
 * **`RawConcurrentIndexed`** - Extremely light version of `ConcurrentIndex`. `RawConcurrentIndexed` Is add only. 
 Enumeration is safe but might not include items added during enumeration.
 
