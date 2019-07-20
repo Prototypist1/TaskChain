@@ -5,11 +5,15 @@ using System.Threading;
 
 namespace Prototypist.TaskChain
 {
-    public class RawConcurrentLinkedList<TValue> : IReadOnlyList<TValue>
+    public class ConcurrentLinkedList<TValue> : IReadOnlyList<TValue>
     {
         protected volatile Link startOfChain;
         protected volatile Link endOfChain = new Link();
         private int count = 0;
+
+        //protected class Link {
+
+        //} 
 
         protected class Link
         {
@@ -68,22 +72,42 @@ namespace Prototypist.TaskChain
             var link = new Link(value);
             while (true)
             {
-                if (Interlocked.CompareExchange(ref endOfChain.next, link, null) == null)
+                var myEndOfChain = endOfChain;
+                if (Interlocked.CompareExchange(ref myEndOfChain.next, link, null) == null)
                 {
                     endOfChain = endOfChain.next;
                     Interlocked.Increment(ref count);
+                    // when adding two items an empty list
+                    // the second one could be the first to claim the "start of chain"
                     Interlocked.CompareExchange(ref startOfChain, link, null);
                     return;
                 }
             }
         }
 
+        public bool RemoveStart() {
+            while (true)
+            {
+                var myStartOfChain = startOfChain;
+                if (myStartOfChain == null) {
+                    return false;
+                }
+                if (Interlocked.CompareExchange(ref startOfChain, myStartOfChain.next, myStartOfChain) == myStartOfChain) {
+                    Interlocked.Decrement(ref count);
+                    
+                    return true;
+                }
+            }
+        }
+
         public IEnumerator<TValue> GetEnumerator() {
             var at = startOfChain;
-            yield return at.Value;
-            while (at.next != null) {
-                at = at.next;
+            if (at != null) {
                 yield return at.Value;
+                while (at.next != null) {
+                    at = at.next;
+                    yield return at.Value;
+                }
             }
         }
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
