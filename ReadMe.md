@@ -14,13 +14,13 @@ It fills a few holes in `System.Collections.Generic`. Specifically, it has a thr
 
 * **`ConcurrentSet`** - A thread safe Set.
 
-* **`ConcurrentIndex`** - A thread safe dictionary. Unlike `ConcurrentDictionary`, `ConcurrentIndex` methods that accept delegates are thread safe. However it does lack may of `ConcurrentDictionary`s features like `Count` and `Remove`.
+* **`ConcurrentIndexed`** - A thread safe dictionary. Unlike `ConcurrentDictionary`, `ConcurrentIndex` methods that accept delegates are thread safe. However it does lack may of `ConcurrentDictionary`s features like `Count` and `Remove`.
 
 * **`QueueingConcurrent<T>`** - Makes an object thread safe by queing code that modify it.
 
 * **`JumpBallConcurrent<T>`** - Makes an object thread safe by retrying until the lock is achieved.
 
-* **`RawConcurrentIndexed`** - Extremely light version of `ConcurrentIndex`. `RawConcurrentIndexed` Is add only. 
+* **`RawConcurrentIndexed`** - Extremely light version of `ConcurrentIndexed`. `RawConcurrentIndexed` Is add only. 
 Enumeration is safe but might not include items added during enumeration.
 
 * **`RawConcurrentArrayList`** - Extremely light version of `ConcurrentArrayList`. `RawConcurrentArrayList` does not support `Set` and 
