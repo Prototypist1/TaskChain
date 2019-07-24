@@ -782,6 +782,78 @@ namespace Prototypist.TaskChain
             
         }
 
+
+        public bool TryRemove(TKey key, out TValue res)
+        {
+
+            if (key == null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            var hash = key.GetHashCode();
+
+            var localOrchard = orchard;
+            int totalSizeInBits = 32 - localOrchard.sizeInBit;
+            ref var at = ref localOrchard.items[(hash >> (totalSizeInBits)) & localOrchard.mask];
+
+            WhereTo:
+
+            if (at is Value existingValue)
+            {
+                if (existingValue.hash == hash)
+                {
+                    if (existingValue.key.Equals(key))
+                    {
+                        at = existingValue.next;
+                        res = existingValue.value;
+                        return true;
+                    }
+                    while (existingValue.next != null)
+                    {
+                        existingValue = existingValue.next;
+                        if (existingValue.key.Equals(key))
+                        {
+                            at = existingValue.next;
+                            res = existingValue.value;
+                            return true;
+                        }
+                    }
+                }
+                res = default;
+                return false;
+            }
+
+            if (at is null)
+            {
+                res = default;
+                return false;
+            }
+
+            if (at is object[] objects)
+            {
+                totalSizeInBits -= sizeInBit;
+                at = ref objects[(hash >> (totalSizeInBits)) & arrayMask];
+                goto WhereTo;
+            }
+
+            if (at is Memory<object> mem)
+            {
+                totalSizeInBits -= sizeInBit;
+                at = ref mem.Span[(hash >> (totalSizeInBits)) & arrayMask];
+                goto WhereTo;
+            }
+
+            if (at is PassThrough pass)
+            {
+                at = ref pass.memory.Span[(hash >> (totalSizeInBits)) & arrayMask];
+                goto WhereTo;
+            }
+
+            throw new Exception("must be one of those!");
+
+        }
+
         private IEnumerable<KeyValuePair<TKey, TValue>> Iterate(object thing)
         {
 

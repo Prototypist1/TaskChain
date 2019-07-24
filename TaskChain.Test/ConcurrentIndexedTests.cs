@@ -22,6 +22,18 @@ namespace Prototypist.TaskChain.Test
 
         [Theory]
         [InlineData(1)]
+        public void TryRemove(int i)
+        {
+            var thing = new ConcurrentIndexed<int, string>();
+
+            Assert.True( thing.TryAdd(i,  "world"));
+            Assert.True(thing.TryRemove(i, out var value));
+            Assert.Equal("world", value);
+            Assert.True(thing.TryAdd(i, "world"));
+        }
+
+        [Theory]
+        [InlineData(1)]
         public void AddUpdateOrThrow(int i)
         {
             var thing = new ConcurrentIndexed<int, string>();

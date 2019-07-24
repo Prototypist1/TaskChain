@@ -27,6 +27,21 @@ namespace Prototypist.TaskChain
             }
         }
 
+        public bool TryRemove(TKey key, out TValue value)
+        {
+            try
+            {
+                NoModificationDuringEnumeration();
+                var res = backing.TryRemove(key, out var jumpBall);
+                value = res?jumpBall.Read(): default;
+                return res;
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
+
         public bool ContainsKey(TKey key)
         {
             return backing.ContainsKey(key);
