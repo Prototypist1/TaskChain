@@ -42,6 +42,21 @@ namespace Prototypist.TaskChain
             }
         }
 
+        public bool TryAdd(TKey key, TValue value)
+        {
+            try
+            {
+                NoModificationDuringEnumeration();
+                var toAdd = new JumpBallConcurrent<TValue>(value);
+                return backing.TryAdd(key, toAdd);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
+
+
         public bool ContainsKey(TKey key)
         {
             return backing.ContainsKey(key);
@@ -296,18 +311,6 @@ namespace Prototypist.TaskChain
                 return;
             }
             throw new Exception("No item found for that key");
-        }
-        public static bool TryAdd<TKey, TValue>(this ConcurrentIndexed<TKey, TValue> self, TKey key, TValue value)
-        {
-            try
-            {
-                self.AddOrThrow(key, value);
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
         }
         public static TValue UpdateOrThrow<TKey, TValue>(this ConcurrentIndexed<TKey, TValue> self, TKey key, Func<TValue, TValue> function)
         {

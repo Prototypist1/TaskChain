@@ -15,7 +15,13 @@ namespace Prototypist.TaskChain
             public Value next;
             public readonly int hash;
             public readonly TKey key;
-            public readonly TValue value;
+            // this can't be read only, we null it out when we remove so we don't leak memory
+            public TValue value;
+            // removing is not super effective
+            // the index never shrinks
+            // items are only removed after their 'next' is populated
+            // 'next' is only used on hash collisions
+            public int removed = 0;
 
             public Value(int hash, TKey key, TValue value)
             {
@@ -24,8 +30,12 @@ namespace Prototypist.TaskChain
                 this.value = value;
             }
         }
-
-        private struct PassThrough {
+        
+        // is a way to have a memory, but singnify that is 
+        // is in the same level of tree
+        // not one level deeper 
+        private struct PassThrough
+        {
             public PassThrough(Memory<object> memory)
             {
                 this.memory = memory;
@@ -378,14 +388,14 @@ namespace Prototypist.TaskChain
             goto WhereToWithToAddOffOrchard;
 
             HashMatch:
-            if (existingValue.key.Equals(key))
+            if (existingValue.removed == 0 && existingValue.key.Equals(key))
             {
                 return false;
             }
             while (existingValue.next != null)
             {
                 existingValue = existingValue.next;
-                if (existingValue.key.Equals(key))
+                if (existingValue.removed == 0 && existingValue.key.Equals(key))
                 {
                     return false;
                 }
@@ -394,7 +404,7 @@ namespace Prototypist.TaskChain
             while (null != Interlocked.CompareExchange(ref existingValue.next, toAdd, null))
             {
                 existingValue = existingValue.next;
-                if (existingValue.key.Equals(key))
+                if (existingValue.removed == 0 && existingValue.key.Equals(key))
                 {
                     return false;
                 }
@@ -689,14 +699,14 @@ namespace Prototypist.TaskChain
             goto WhereToWithToAddOffOrchard;
 
         HashMatch:
-            if (existingValue.key.Equals(key))
+            if (existingValue.removed == 0 && existingValue.key.Equals(key))
             {
                 return existingValue.value;
             }
             while (existingValue.next != null)
             {
                 existingValue = existingValue.next;
-                if (existingValue.key.Equals(key))
+                if (existingValue.removed == 0 && existingValue.key.Equals(key))
                 {
                     return existingValue.value;
                 }
@@ -705,7 +715,7 @@ namespace Prototypist.TaskChain
             while (null != Interlocked.CompareExchange(ref existingValue.next, toAdd, null))
             {
                 existingValue = existingValue.next;
-                if (existingValue.key.Equals(key))
+                if (existingValue.removed == 0 && existingValue.key.Equals(key))
                 {
                     return existingValue.value;
                 }
@@ -736,7 +746,7 @@ namespace Prototypist.TaskChain
             if (at is Value existingValue) {
                 if (existingValue.hash == hash)
                 {
-                    if (existingValue.key.Equals(key))
+                    if (existingValue.removed ==0 && existingValue.key.Equals(key))
                     {
                         res = existingValue.value;
                         return true;
@@ -744,7 +754,7 @@ namespace Prototypist.TaskChain
                     while (existingValue.next != null)
                     {
                         existingValue = existingValue.next;
-                        if (existingValue.key.Equals(key))
+                        if (existingValue.removed == 0 && existingValue.key.Equals(key))
                         {
                             res = existingValue.value;
                             return true;
@@ -782,7 +792,6 @@ namespace Prototypist.TaskChain
             
         }
 
-
         public bool TryRemove(TKey key, out TValue res)
         {
 
@@ -799,35 +808,56 @@ namespace Prototypist.TaskChain
 
             WhereTo:
 
+            if (at is null)
+            {
+                res = default;
+                return false;
+            }
+
             if (at is Value existingValue)
             {
                 if (existingValue.hash == hash)
                 {
                     if (existingValue.key.Equals(key))
                     {
+                        if (Interlocked.CompareExchange(ref existingValue.removed, 1, 0) == 0)
+                        {
+                            goto Remove;
+                        }
+                    }
+                    if (existingValue.removed == 1 && existingValue.next != null)
+                    {
                         at = existingValue.next;
-                        res = existingValue.value;
-                        return true;
                     }
                     while (existingValue.next != null)
                     {
                         existingValue = existingValue.next;
                         if (existingValue.key.Equals(key))
                         {
+                            if (Interlocked.CompareExchange(ref existingValue.removed, 1, 0) == 0)
+                            {
+                                goto Remove;
+                            }
+                        }
+                        if (existingValue.removed == 1 && existingValue.next != null)
+                        {
                             at = existingValue.next;
-                            res = existingValue.value;
-                            return true;
                         }
                     }
                 }
                 res = default;
                 return false;
-            }
 
-            if (at is null)
-            {
-                res = default;
-                return false;
+                Remove:
+
+                Interlocked.Decrement(ref count);
+                if (existingValue.next != null)
+                {
+                    at = existingValue.next;
+                }
+                res = existingValue.value;
+                existingValue.value = default;
+                return true;
             }
 
             if (at is object[] objects)
@@ -851,7 +881,6 @@ namespace Prototypist.TaskChain
             }
 
             throw new Exception("must be one of those!");
-
         }
 
         private IEnumerable<KeyValuePair<TKey, TValue>> Iterate(object thing)
@@ -859,7 +888,12 @@ namespace Prototypist.TaskChain
 
             if (thing is Value value)
             {
-                yield return new KeyValuePair<TKey, TValue>(value.key, value.value);
+                do {
+                    if (value.removed == 0)
+                    {
+                        yield return new KeyValuePair<TKey, TValue>(value.key, value.value);
+                    }
+                } while ((value = value.next) != null);
             }
 
             if (thing is object[] things)
@@ -944,15 +978,16 @@ namespace Prototypist.TaskChain
                     {
                         var target = orchard.items[at];
 
+                        var toAdd = new Memory<object>(nextOrcard, at * arraySize, arraySize);
+
                         if (target is null)
                         {
-                            var toAdd = new Memory<object>(nextOrcard, at * arraySize, arraySize);
+                            
                             target = Interlocked.CompareExchange(ref orchard.items[at], toAdd, null);
                         }
 
                         if (target is Value value)
                         {
-                            var toAdd = new Memory<object>(nextOrcard, at * arraySize, arraySize);
                             toAdd.Span[(value.hash >> (32 - orchard.sizeInBit - sizeInBit)) & arrayMask] = value;
                             target = Interlocked.CompareExchange(ref orchard.items[at], toAdd, value);
                         }
@@ -963,17 +998,17 @@ namespace Prototypist.TaskChain
                             {
                                 var innerTarget = array[j];
 
+                                var innerToAdd = new PassThrough(toAdd);
+
                                 if (innerTarget is null)
                                 {
-                                    var toAdd = new PassThrough(new Memory<object>(nextOrcard, at * arraySize, arraySize));
-                                    innerTarget = Interlocked.CompareExchange(ref array[j], toAdd, null);
+                                    innerTarget = Interlocked.CompareExchange(ref array[j], innerToAdd, null);
                                 }
 
                                 if (innerTarget is Value innerValue)
                                 {
-                                    var toAdd = new PassThrough(new Memory<object>(nextOrcard, at * arraySize, arraySize));
-                                    toAdd.memory.Span[j] = innerValue;
-                                    innerTarget = Interlocked.CompareExchange(ref array[j], toAdd, innerValue);
+                                    toAdd.Span[j] = innerValue;
+                                    innerTarget = Interlocked.CompareExchange(ref array[j], innerToAdd, innerValue);
                                 }
 
                                 if (innerTarget is Memory<object>)

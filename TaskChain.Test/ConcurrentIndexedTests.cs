@@ -1,6 +1,8 @@
 ﻿
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -27,9 +29,12 @@ namespace Prototypist.TaskChain.Test
             var thing = new ConcurrentIndexed<int, string>();
 
             Assert.True( thing.TryAdd(i,  "world"));
+            Assert.Single(thing);
             Assert.True(thing.TryRemove(i, out var value));
+            Assert.Empty(thing);
             Assert.Equal("world", value);
             Assert.True(thing.TryAdd(i, "world"));
+            Assert.Single(thing);
         }
 
         [Theory]
@@ -267,5 +272,92 @@ namespace Prototypist.TaskChain.Test
             }
         }
 
+        [Fact]
+        public void RawAddAndRemove()
+        {
+
+            var random = new Random();
+
+            for (int i = 0; i < 10000; i++)
+            {
+                const int V = 1000;
+                var check = new int[V];
+                var thing = new RawConcurrentIndexed<int, string>();
+
+                int count = 0;
+
+                Parallel.Invoke(new int[10000].Select<int, Action>(_ => () => {
+
+                    var value = random.Next(1000);
+                    if (random.Next(2) == 1)
+                    {
+                        if (thing.TryAdd(value, value.ToString()))
+                        {
+                            Interlocked.Increment(ref check[value]);
+                            Interlocked.Increment(ref count);
+                        }
+                    }
+                    else
+                    {
+                        if (thing.TryRemove(value, out var _))
+                        {
+                            Interlocked.Decrement(ref check[value]);
+                            Interlocked.Decrement(ref count);
+                        }
+                    }
+                }).ToArray());
+
+
+                Assert.Equal(count, thing.Count);
+                for (int j = 0; j < V; j++)
+                {
+                    Assert.Equal(check[j] > 0, thing.ContainsKey(j));
+                }
+            }
+        }
+
+        [Fact]
+        public void AddAndRemove()
+        {
+
+            var random = new Random();
+
+            for (int i = 0; i < 10000; i++)
+            {
+                const int V = 1000;
+                var check = new int[V];
+                var thing = new ConcurrentIndexed<int, string>();
+
+                int count = 0;
+
+                Parallel.Invoke(new int[10000].Select<int, Action>(_ => () => {
+
+                    var value = random.Next(1000);
+                    if (random.Next(2) == 1)
+                    {
+                        if (thing.TryAdd(value, value.ToString()))
+                        {
+                            Interlocked.Increment(ref check[value]);
+                            Interlocked.Increment(ref count);
+                        }
+                    }
+                    else
+                    {
+                        if (thing.TryRemove(value, out var _))
+                        {
+                            Interlocked.Decrement(ref check[value]);
+                            Interlocked.Decrement(ref count);
+                        }
+                    }
+                }).ToArray());
+
+
+                Assert.Equal(count, thing.Count);
+                for (int j = 0; j < V; j++)
+                {
+                    Assert.Equal(check[j] > 0, thing.ContainsKey(j));
+                }
+            }
+        }
     }
 }
