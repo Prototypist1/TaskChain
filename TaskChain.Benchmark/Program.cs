@@ -34,7 +34,7 @@ namespace Prototypist.TaskChain.Benchmark
 
             //var db = 0;
 
-            var summary = BenchmarkRunner.Run<HashCollisionTest>();
+            var summary = BenchmarkRunner.Run<ReadAllItems>();
             Console.WriteLine(summary);
 
             //foreach (var i in new[] { 10, 100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000 })

@@ -1,0 +1,241 @@
+ConcurrentDictionary.TryGetValue: 11.35 
+ConcurrentDictionary.TryGetValue object: 31.43
+
+Dictionary.TryGetValue: 12.74
+
+RawConcurrentHashIndexedTree<int, Concurrent<int>>.TryGet,  var db = x.Value; : 12.52
+RawConcurrentHashIndexedTree<int, Concurrent<int>>.GetNodeOrThrow.Value.value : 9.025
+^ + (TValue)Volatile.Read : 10.09
+^ no return, no .Value.value: 6.77
+^ return 1: 6.86
+^ just return concurrent list node: 5.96
+RawConcurrentHashIndexedTree<int, Concurrent<int>>.TryGet, no return: 10.06
+ConcurrentHashIndexedTree.TryGet, no enum protection: 28.96
+^use default not the real value: 11.33
+^use real value, removed a lot of buildableConcurrent: 15.54
+^ added enum protection: 36.33 yikes
+^ removed Volatile: 33.55
+^ removed try: 21.16
+^ added back try, removed interlocked: 21.03
+^ removed code from NoModificationDuringEnumeration: 13.00
+^ removed call to NoModificationDuringEnumeration: 12.81
+^ removed try: 12.74
+^ assume happy path: 12.98
+^ rewrote using .GetNodeOrThrow(key).value.Value and a try: 12.99
+^ with RawConcurrentHashIndexed instead of tree: 6.38 ns
+
+ConcurrentHashIndexedTree.TryGet object: 17.06
+
+RawConcurrentHashIndexed<int, Concurrent<int>>.GetNodeOrThrow: 3.179 
+^ fixed a bug!: 17.606
+^ changed equals to be called on the object: 17.52 
+^ uint: 8.55
+^ goto: 8.45
+^ added hash early exit: 9.63
+
+Contains with depth of 2: 18.86
+^ attemped to reduce jumps: 19.80
+^ second attemp : 24.00 
+
+target: 5.812
+
+a lot of updates on 4 threads: 20.40
+^ with locks: 6.77
+^ unprotected: 14.93
+^ all locks: 6.55
+^ pushed more down: 6?
+^ removed enumeration protection: 
+
+WRITE:
+
+target : 14.44
+
+RawConcurrentHashIndexed: 28.95
+^ protected the interlocked a bit : 25.52
+^ removed outer interlocked : 24.81
+^ removed do: 10.87
+^ empty do: 21.22
+^ added full do back, wrapped Spin until in an if: 22.50
+^ TryRun without all the interlocked: 22.57
+^ clean up: 22.27
+^ moved object constructor: 26.39
+^ refactored innor object out: 18.92
+^ flattened indexedlist and concurrent in to one object: 17.75
+^ revived so good code: 19.94
+^ removed a loop I don't need: 20.26
+^ early exit on some interlocked: 
+^ new algo: 15.51
+^ simpler code: 15.11 (no way this is really faster tho)
+^ increased Dictionary size to 128: 14.95
+^ up to 1024: 15.11
+^ added back enum guards, size 128: 17.74
+^ removed a check that was trying to protect an interlocked: 18.77
+^ undid last: 17.75
+^ spin until vs while: 18.00
+^ undid + set has no code in it: 17.73
+^ make some methods not virtual: 17.47
+^ is goto really faster: 17.47
+^ removed an early exit: 20.09
+^ added it back, flattened some ifs in ifs: 17.54
+^ saved a call to getHashCode: 17.46
+
+to try: 
+Concurrent item set?
+    something like action chainer but with the understand it locks on object so it can handle simple things like get and set
+    all this would save me is lambdas...
+
+
+
+====================
+
+39 second
+^ no run no wait: 24 ms
+^ no wait: 19 ms 
+^ has wait object but does not wait: 21 ms
+
+
+=========================== way later 
+
+working on ReadAllItems
+
+500 + 8 rawConcurrentIndexed: 737 us
+500 + 8 ConcurrentDictionary: 791 us
+
+500 + 8 rawConcurrentIndexed: 686 us -> saved myself a try, in exchanged for duplicate code
+
+mine was: 80 ms
+
+               Method | Items | Threads |          Mean |       Error |        StdDev | Rank |
+--------------------- |------ |-------- |--------------:|------------:|--------------:|-----:|
+                 Mine |     1 |       1 |      7.653 us |   0.0234 us |     0.0195 us |    1 |
+ ConcurrentDictionary |     1 |       1 |     21.243 us |   0.1011 us |     0.0896 us |    2 |
+                 Mine |     1 |       6 |     21.468 us |   0.2973 us |     0.2781 us |    3 |
+ ConcurrentDictionary |     1 |       6 |     42.923 us |   0.4730 us |     0.4193 us |    5 |
+                 Mine |     1 |      12 |     33.929 us |   0.2880 us |     0.2694 us |    4 |
+ ConcurrentDictionary |     1 |      12 |     66.750 us |   0.6692 us |     0.6260 us |    7 |
+                 Mine |    20 |       1 |     56.839 us |   0.1061 us |     0.0940 us |    6 |
+ ConcurrentDictionary |    20 |       1 |     69.078 us |   0.1744 us |     0.1546 us |    8 |
+                 Mine |    20 |       6 |     89.525 us |   0.7170 us |     0.6707 us |    9 |
+ ConcurrentDictionary |    20 |       6 |    127.211 us |   0.6206 us |     0.5805 us |   10 |
+                 Mine |    20 |      12 |    132.146 us |   2.5555 us |     3.1384 us |   11 |
+ ConcurrentDictionary |    20 |      12 |    183.959 us |   3.5682 us |     5.0021 us |   12 |
+                 Mine |   500 |       1 | 19,671.685 us | 121.1916 us |   113.3626 us |   16 |
+ ConcurrentDictionary |   500 |       1 |  9,456.304 us |  95.7803 us |    84.9068 us |   13 |
+                 Mine |   500 |       6 | 20,269.119 us | 258.6214 us |   241.9146 us |   17 |
+ ConcurrentDictionary |   500 |       6 |  9,683.577 us | 190.3314 us |   247.4846 us |   14 |
+                 Mine |   500 |      12 | 26,403.650 us | 550.3496 us | 1,033.6899 us |   18 |
+ ConcurrentDictionary |   500 |      12 | 14,610.613 us | 287.5080 us |   547.0139 us |   15 |
+
+this is all reads, so probably lock-less on all platforms
+
+I made nodes have 4 children on Mine
+and created RawConcurrentGrowingIndex
+
+
+                    Method | Items | Threads |          Mean |       Error |      StdDev | Rank |
+-------------------------- |------ |-------- |--------------:|------------:|------------:|-----:|
+                    Simple |     1 |       1 |     19.260 us |   0.0528 us |   0.0412 us |    3 |
+                      Mine |     1 |       1 |      7.812 us |   0.1525 us |   0.1427 us |    1 |
+ RawConcurrentGrowingIndex |     1 |       1 |     11.349 us |   0.1086 us |   0.1016 us |    2 |
+      ConcurrentDictionary |     1 |       1 |     21.392 us |   0.1646 us |   0.1540 us |    4 |
+                    Simple |     1 |      12 |     65.587 us |   0.6411 us |   0.5683 us |    8 |
+                      Mine |     1 |      12 |     33.288 us |   0.1690 us |   0.1499 us |    5 |
+ RawConcurrentGrowingIndex |     1 |      12 |     46.560 us |   0.2399 us |   0.2127 us |    6 |
+      ConcurrentDictionary |     1 |      12 |     64.797 us |   0.5563 us |   0.5203 us |    7 |
+                    Simple |   500 |       1 |  8,506.929 us | 152.3778 us | 142.5343 us |    9 |
+                      Mine |   500 |       1 | 19,956.584 us | 158.9463 us | 148.6785 us |   15 |
+ RawConcurrentGrowingIndex |   500 |       1 | 11,200.962 us |  69.8732 us |  65.3594 us |   11 |
+      ConcurrentDictionary |   500 |       1 |  9,669.783 us |  53.9679 us |  50.4816 us |   10 |
+                    Simple |   500 |      12 | 14,716.408 us | 294.3243 us | 275.3111 us |   13 |
+                      Mine |   500 |      12 | 24,993.241 us | 493.3067 us | 837.6723 us |   16 |
+ RawConcurrentGrowingIndex |   500 |      12 | 16,314.167 us | 319.9337 us | 525.6603 us |   14 |
+      ConcurrentDictionary |   500 |      12 | 13,865.290 us | 272.7525 us | 314.1022 us |   12 |
+
+I now grow more aggressively, slightly better, no suprise:
+
+                    Method | Items | Threads |         Mean |       Error |      StdDev | Rank |
+-------------------------- |------ |-------- |-------------:|------------:|------------:|-----:|
+ RawConcurrentGrowingIndex |     1 |       1 |     11.17 us |   0.0183 us |   0.0153 us |    1 |
+ RawConcurrentGrowingIndex |     1 |      12 |     46.70 us |   0.1600 us |   0.1336 us |    2 |
+ RawConcurrentGrowingIndex |   500 |       1 | 10,828.06 us | 102.8341 us |  96.1910 us |    3 |
+ RawConcurrentGrowingIndex |   500 |      12 | 14,995.52 us | 293.1830 us | 497.8470 us |    4 |
+
+I increased the index length of mine, and it did not help much... did that even build?
+
+ Method | Items | Threads |          Mean |       Error |      StdDev | Rank |
+------- |------ |-------- |--------------:|------------:|------------:|-----:|
+   Mine |     1 |       1 |      7.568 us |   0.0147 us |   0.0130 us |    1 |
+   Mine |     1 |      12 |     33.279 us |   0.2891 us |   0.2704 us |    2 |
+   Mine |   500 |       1 | 19,427.722 us | 113.7912 us | 100.8729 us |    3 |
+   Mine |   500 |      12 | 22,909.090 us | 443.4774 us | 663.7762 us |    4 |
+
+added tree
+
+   Method | Items | Threads |          Mean |       Error |        StdDev |        Median | Rank |
+------- |------ |-------- |--------------:|------------:|--------------:|--------------:|-----:|
+   Mine |     1 |       1 |      7.620 us |   0.0536 us |     0.0502 us |      7.641 us |    2 |
+   Tree |     1 |       1 |      7.572 us |   0.0196 us |     0.0163 us |      7.570 us |    1 |
+   Mine |     1 |      12 |     33.724 us |   0.5668 us |     0.5301 us |     33.611 us |    3 |
+   Tree |     1 |      12 |     33.652 us |   0.4547 us |     0.4253 us |     33.588 us |    3 |
+   Mine |   500 |       1 | 20,642.553 us | 328.5081 us |   307.2866 us | 20,638.840 us |    5 |
+   Tree |   500 |       1 | 18,996.611 us | 342.3083 us |   320.1953 us | 18,913.067 us |    4 |
+   Mine |   500 |      12 | 25,689.043 us | 506.8735 us | 1,058.0338 us | 25,680.956 us |    7 |
+   Tree |   500 |      12 | 23,210.821 us | 487.9130 us | 1,438.6225 us | 22,779.094 us |    6 |
+
+I doubled the index and that seems to have made it slower, that is impossible (size: 16)
+
+ Method | Items | Threads |          Mean |       Error |        StdDev | Rank |
+------- |------ |-------- |--------------:|------------:|--------------:|-----:|
+   Tree |     1 |       1 |      7.565 us |   0.0334 us |     0.0296 us |    1 |
+   Tree |     1 |      12 |     33.590 us |   0.2333 us |     0.2182 us |    2 |
+   Tree |   500 |       1 | 19,249.641 us | 131.7349 us |   123.2249 us |    3 |
+   Tree |   500 |      12 | 25,439.978 us | 482.4032 us | 1,155.8073 us |    4 |
+
+I increased the index yet more and saw even worse pref (size 1024)
+
+    Method | Items | Threads |          Mean |       Error |        StdDev | Rank |
+------- |------ |-------- |--------------:|------------:|--------------:|-----:|
+   Tree |     1 |       1 |      7.675 us |   0.0349 us |     0.0326 us |    1 |
+   Tree |     1 |      12 |     34.803 us |   0.4701 us |     0.4167 us |    2 |
+   Tree |   500 |       1 | 29,262.586 us | 376.4702 us |   352.1504 us |    3 |
+   Tree |   500 |      12 | 40,621.272 us | 900.6928 us | 2,627.3632 us |    4 |
+
+// * Warnings *
+MultimodalDistribution
+  ReadAllItems.Tree: Default -> It seems that the distribution is bimodal (mValue = 3.9)
+
+  
+Ok, what happens if I turn it down... (size 2)
+
+  Method | Items | Threads |     Mean |     Error |    StdDev | Rank |
+------- |------ |-------- |---------:|----------:|----------:|-----:|
+   Tree |   500 |       1 | 19.59 ms | 0.1982 ms | 0.1854 ms |    1 |
+
+(size 4)?
+
+Method | Items | Threads |     Mean |     Error |    StdDev | Rank |
+------- |------ |-------- |---------:|----------:|----------:|-----:|
+   Tree |   500 |       1 | 19.56 ms | 0.0582 ms | 0.0516 ms |    1 |
+
+something something cache misses??
+
+micro optmised if statements
+
+ Method | Items | Threads |     Mean |     Error |    StdDev | Rank |
+------- |------ |-------- |---------:|----------:|----------:|-----:|
+   Tree |   500 |       1 | 18.85 ms | 0.0537 ms | 0.0448 ms |    1 |
+
+size 16
+
+Method | Items | Threads |     Mean |     Error |    StdDev | Rank |
+------- |------ |-------- |---------:|----------:|----------:|-----:|
+   Tree |   500 |       1 | 18.61 ms | 0.1444 ms | 0.1280 ms |    1 |
+
+adding:
+
+               Method | Items | Threads |     Mean |     Error |    StdDev | Rank |
+--------------------- |------ |-------- |---------:|----------:|----------:|-----:|
+ ConcurrentDictionary |   500 |       4 | 2.549 ms | 0.1469 ms | 0.4261 ms |    1 |
+
+ changed the size of tree nodes from 2^4 to 2^8
+Tree    average: 17.173, std: 8.16037147822709
