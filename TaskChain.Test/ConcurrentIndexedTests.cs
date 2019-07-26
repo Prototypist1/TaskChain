@@ -313,6 +313,10 @@ namespace Prototypist.TaskChain.Test
                 {
                     Assert.Equal(check[j] > 0, thing.ContainsKey(j));
                 }
+                foreach (var item in thing)
+                {
+                    Assert.True(check[item.Key] > 0);
+                }
             }
         }
 
@@ -356,6 +360,10 @@ namespace Prototypist.TaskChain.Test
                 for (int j = 0; j < V; j++)
                 {
                     Assert.Equal(check[j] > 0, thing.ContainsKey(j));
+                }
+                foreach (var item in thing)
+                {
+                    Assert.True(check[item.Key] > 0);
                 }
             }
         }
