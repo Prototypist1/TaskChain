@@ -110,15 +110,15 @@ namespace Prototypist.TaskChain.Test
         }
 
         [Fact]
-        public void TryGet()
+        public void TryGetValue()
         {
             var target = new ConcurrentIndexed<int, string>();
 
-            Assert.False(target.TryGet(1,out var _));
+            Assert.False(target.TryGetValue(1,out var _));
 
             target.AddOrThrow(1, "1");
 
-            Assert.True(target.TryGet(1, out var second));
+            Assert.True(target.TryGetValue(1, out var second));
             Assert.Equal("1", second);
         }
 

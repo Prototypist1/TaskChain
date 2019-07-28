@@ -148,7 +148,7 @@ namespace Prototypist.TaskChain.Benchmark
             //        concurrentHashIndexedTree.UpdateOrAdd(x, z=>z+y,y);
             //    }
             //});
-            concurrentHashIndexedTree2.TryGet(new HashTest(1, 1),out var _);
+            concurrentHashIndexedTree2.TryGetValue(new HashTest(1, 1),out var _);
             //concurrentHashIndexedTree.GetNodeOrThrow(1);//.value.Value;
             //var db = x.Value;
         }

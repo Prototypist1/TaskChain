@@ -63,12 +63,44 @@ namespace Prototypist.TaskChain
             }
         }
 
+
+        public void RemoveOrThrow(T value)
+        {
+            try
+            {
+                NoModificationDuringEnumeration();
+                var res = backing.TryRemove(value,out _);
+                if (!res)
+                {
+                    throw new Exception("Item already added");
+                }
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
+
+
         public bool TryAdd(T value)
         {
             try
             {
                 NoModificationDuringEnumeration();
                 return backing.TryAdd(value, value);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref enumerationCount);
+            }
+        }
+
+        public bool TryRemove(T value)
+        {
+            try
+            {
+                NoModificationDuringEnumeration();
+                return backing.TryRemove(value, out _);
             }
             finally
             {

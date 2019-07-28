@@ -67,7 +67,7 @@ namespace Prototypist.TaskChain
             set =>Set(key, value);
         }
 
-        public bool TryGet(TKey key, out TValue res)
+        public bool TryGetValue(TKey key, out TValue res)
         {
             try
             {
@@ -283,7 +283,7 @@ namespace Prototypist.TaskChain
             Interlocked.Add(ref enumerationCount, -enumerationAdd);
         }
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-        public bool TryGetValue(TKey key, out TValue value) => throw new NotImplementedException();
+
     }
 
     public static class ConcurrentHashIndexedTreeExtensions
@@ -298,7 +298,7 @@ namespace Prototypist.TaskChain
         }
         public static TValue GetOrThrow<TKey, TValue>(this ConcurrentIndexed<TKey, TValue> self, TKey key)
         {
-            if (self.TryGet(key, out var res))
+            if (self.TryGetValue(key, out var res))
             {
                 return res;
             }
