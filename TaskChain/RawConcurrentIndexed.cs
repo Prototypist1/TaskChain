@@ -142,7 +142,7 @@ namespace Prototypist.TaskChain
                 while (((existingValue.hash >> (localOffset)) & arrayMask) == ((toAdd.hash >> (localOffset)) & arrayMask))
                 {
                     var nextLocalIndex = new object[arraySize];
-                    localIndex[((existingValue.hash >> (localOffset)) & arrayMask)] = nextLocalIndex;
+                    localIndex[(existingValue.hash >> (localOffset)) & arrayMask] = nextLocalIndex;
                     localIndex = nextLocalIndex;
                     localOffset -= sizeInBit;
                 }
@@ -454,7 +454,7 @@ namespace Prototypist.TaskChain
                 while (((existingValue.hash >> (localOffset)) & arrayMask) == ((toAdd.hash >> (localOffset)) & arrayMask))
                 {
                     var nextLocalIndex = new object[arraySize];
-                    localIndex[((existingValue.hash >> (localOffset)) & arrayMask)] = nextLocalIndex;
+                    localIndex[(existingValue.hash >> (localOffset)) & arrayMask] = nextLocalIndex;
                     localIndex = nextLocalIndex;
                     localOffset -= sizeInBit;
                 }
