@@ -8,6 +8,7 @@ using Xunit;
 
 namespace Prototypist.TaskChain.Test
 {
+
     public class ConcurrentIndexedTests
     {
         [Theory]

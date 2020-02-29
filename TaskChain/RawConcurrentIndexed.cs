@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 
 namespace Prototypist.TaskChain
 {
+
     public class RawConcurrentIndexed<TKey, TValue> : IReadOnlyDictionary<TKey, TValue>
     {
 
@@ -30,7 +31,7 @@ namespace Prototypist.TaskChain
                 this.value = value;
             }
         }
-        
+
         // is a way to have a memory, but singnify that is 
         // is in the same level of tree
         // not one level deeper 
@@ -126,7 +127,7 @@ namespace Prototypist.TaskChain
             var at = localOrchard.items[(hash >> (totalSizeInBits)) & localOrchard.mask];
 
 #pragma warning disable CS0164 // This label has not been referenced
-            WhereTo:
+        WhereTo:
 #pragma warning restore CS0164 // This label has not been referenced
 
             if ((existingValue = at as Value) != null)
@@ -196,7 +197,7 @@ namespace Prototypist.TaskChain
 
             throw new Exception("must be one of those!");
 
-            WhereToWithToAdd:
+        WhereToWithToAdd:
 
             if ((existingValue = at as Value) != null)
             {
@@ -263,7 +264,7 @@ namespace Prototypist.TaskChain
 
             throw new Exception("must be one of those!");
 
-            WhereToOffOrchard:
+        WhereToOffOrchard:
             if ((existingValue = at as Value) != null)
             {
                 if (existingValue.hash == hash)
@@ -304,7 +305,7 @@ namespace Prototypist.TaskChain
             throw new Exception("this should never happen");
 
 
-            WhereToWithToAddOffOrchard:
+        WhereToWithToAddOffOrchard:
             if ((existingValue = at as Value) != null)
             {
                 if (existingValue.hash == hash)
@@ -344,9 +345,9 @@ namespace Prototypist.TaskChain
 
             throw new Exception("this should never happen");
 
-            IsNullOffOrcard:
+        IsNullOffOrcard:
             toAdd = new Value(hash, key, value);
-            IsNullWithToAddOffOrcard:
+        IsNullWithToAddOffOrcard:
             if ((at = Interlocked.CompareExchange(ref array[(hash >> (totalSizeInBits)) & arrayMask], toAdd, null)) == null)
             {
                 size = targetOrchardSize;
@@ -358,9 +359,9 @@ namespace Prototypist.TaskChain
             }
             goto WhereToWithToAddOffOrchard;
 
-            IsValueOffOrcard:
+        IsValueOffOrcard:
             toAdd = new Value(hash, key, value);
-            IsValueWithToAdd:
+        IsValueWithToAdd:
             newIndex = new object[arraySize];
             localOffset = totalSizeInBits - sizeInBit;
             localIndex = newIndex;
@@ -387,7 +388,7 @@ namespace Prototypist.TaskChain
             // we actually know this is an array
             goto WhereToWithToAddOffOrchard;
 
-            HashMatch:
+        HashMatch:
             if (existingValue.removed == 0 && existingValue.key.Equals(key))
             {
                 return false;
@@ -572,7 +573,7 @@ namespace Prototypist.TaskChain
                 at = array[(hash >> (totalSizeInBits)) & arrayMask];
                 goto WhereToOffOrchard;
             }
-            
+
             throw new Exception("must be one of those!");
 
         WhereToOffOrchard:
@@ -606,7 +607,8 @@ namespace Prototypist.TaskChain
                 goto WhereToOffOrchard;
             }
 
-            if (at is PassThrough) {
+            if (at is PassThrough)
+            {
                 array = ((PassThrough)at).memory.Span;
                 at = array[(hash >> (totalSizeInBits)) & arrayMask];
                 goto WhereToOffOrchard;
@@ -743,10 +745,11 @@ namespace Prototypist.TaskChain
 
         WhereTo:
 
-            if (at is Value existingValue) {
+            if (at is Value existingValue)
+            {
                 if (existingValue.hash == hash)
                 {
-                    if (existingValue.removed ==0 && existingValue.key.Equals(key))
+                    if (existingValue.removed == 0 && existingValue.key.Equals(key))
                     {
                         res = existingValue.value;
                         return true;
@@ -771,25 +774,28 @@ namespace Prototypist.TaskChain
                 return false;
             }
 
-            if (at is object[] objects) {
+            if (at is object[] objects)
+            {
                 totalSizeInBits -= sizeInBit;
                 at = objects[(hash >> (totalSizeInBits)) & arrayMask];
                 goto WhereTo;
             }
 
-            if (at is Memory<object> mem) {
+            if (at is Memory<object> mem)
+            {
                 totalSizeInBits -= sizeInBit;
                 at = mem.Span[(hash >> (totalSizeInBits)) & arrayMask];
                 goto WhereTo;
             }
 
-            if (at is PassThrough pass) {
+            if (at is PassThrough pass)
+            {
                 at = pass.memory.Span[(hash >> (totalSizeInBits)) & arrayMask];
                 goto WhereTo;
             }
 
             throw new Exception("must be one of those!");
-            
+
         }
 
         public bool TryRemove(TKey key, out TValue res)
@@ -806,7 +812,7 @@ namespace Prototypist.TaskChain
             int totalSizeInBits = 32 - localOrchard.sizeInBit;
             ref var at = ref localOrchard.items[(hash >> (totalSizeInBits)) & localOrchard.mask];
 
-            WhereTo:
+        WhereTo:
 
             if (at is null)
             {
@@ -848,7 +854,7 @@ namespace Prototypist.TaskChain
                 res = default;
                 return false;
 
-                Remove:
+            Remove:
 
                 Interlocked.Decrement(ref count);
                 if (existingValue.next != null)
@@ -888,7 +894,8 @@ namespace Prototypist.TaskChain
 
             if (thing is Value value)
             {
-                do {
+                do
+                {
                     if (value.removed == 0)
                     {
                         yield return new KeyValuePair<TKey, TValue>(value.key, value.value);
@@ -982,7 +989,7 @@ namespace Prototypist.TaskChain
 
                         if (target is null)
                         {
-                            
+
                             target = Interlocked.CompareExchange(ref orchard.items[at], toAdd, null);
                         }
 
@@ -1041,7 +1048,7 @@ namespace Prototypist.TaskChain
                     orchard = new Orchard(nextOrcard, orchard.sizeInBit + sizeInBit, (orchard.mask << sizeInBit) | arrayMask);
                     return x;
                 });
-            }  
+            }
         }
 
 
