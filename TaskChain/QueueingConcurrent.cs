@@ -9,9 +9,10 @@ namespace Prototypist.TaskChain
     public static class QueueingConcurrent
     {
 
-        private class FirstComeFirstServe<Tinputs>
+        private class FirstComeFirstServe<TInputs>
         {
-            public Task<Tinputs> main;
+            public TaskCompletionSource<TInputs> main = new TaskCompletionSource<TInputs>();
+            public object first = null;
         }
 
         private class CrossSyncLink<T,TInputs>
@@ -38,19 +39,19 @@ namespace Prototypist.TaskChain
                 if (await GotAll)
                 {
                     MyValue.SetResult(value);
-                    var thing = new TaskCompletionSource<TInputs>();
-                    if (Interlocked.CompareExchange(ref FirstComeFirstServe.main, thing.Task, null) == null)
+                    if (Interlocked.CompareExchange(ref FirstComeFirstServe.first, FirstComeFirstServe.main, null) == null)
                     {
+
                         try
                         {
-                            thing.SetResult(Func(await Inputs));
+                            FirstComeFirstServe.main.SetResult(Func(await Inputs));
                         }
                         catch (Exception e)
                         {
-                            thing.SetException(e);
+                            FirstComeFirstServe.main.SetException(e);
                         }
                     }
-                    return Covert(await FirstComeFirstServe.main); ;
+                    return Covert(await FirstComeFirstServe.main.Task); ;
                 }
                 return value;
             }
@@ -84,7 +85,7 @@ namespace Prototypist.TaskChain
             concurrent1.TryProcess();
             concurrent2.TryProcess();
             
-            return firstComeFirstServe.main;
+            return firstComeFirstServe.main.Task;
         }
 
         public static Task<Tuple<T1, T2, T3>> Act<T1, T2, T3>(QueueingConcurrent<T1> concurrent1, QueueingConcurrent<T2> concurrent2, QueueingConcurrent<T3> concurrent3, Func<Tuple<T1, T2, T3>, Tuple<T1, T2, T3>> function)
@@ -120,7 +121,7 @@ namespace Prototypist.TaskChain
             concurrent2.TryProcess();
             concurrent3.TryProcess();
 
-            return firstComeFirstServe.main;
+            return firstComeFirstServe.main.Task;
         }
 
     }
