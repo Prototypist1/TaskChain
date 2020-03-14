@@ -15,25 +15,25 @@ namespace Prototypist.TaskChain
 
             private readonly int viewId;
 
-            public View() {
+            public View()
+            {
                 viewId = Interlocked.Increment(ref count);
             }
 
             public bool TryGetValue(TKey key, out TValue value)
             {
                 var hashCode = key.GetHashCode();
+
                 var at = backing[hashCode & size];
 
                 while (true)
                 {
-
                     if (at == null)
                     {
                         value = default;
                         return false;
                     }
-
-                    if (at.hash == hashCode && at.viewId == viewId && at.key.Equals(key))
+                    else if (at.hash == hashCode && at.viewId == viewId && at.key.Equals(key))
                     {
                         value = (TValue)at.value;
                         return true;
@@ -45,7 +45,8 @@ namespace Prototypist.TaskChain
 
             public TValue GetOrThrow(TKey key)
             {
-                if (TryGetValue(key, out var value)) {
+                if (TryGetValue(key, out var value))
+                {
                     return value;
                 }
                 throw new KeyNotFoundException(key.ToString());
@@ -60,18 +61,28 @@ namespace Prototypist.TaskChain
 
 
                 var hashCode = key.GetHashCode();
-                ref Value at = ref backing[hashCode & size];
 
                 var mine = new Value(hashCode, key, value, viewId);
 
+                var at = Interlocked.CompareExchange(ref backing[hashCode & size], mine, null);
+
+                if (at == null)
+                {
+                    return true;
+                }
+                else if (at.hash == hashCode && at.viewId == viewId && at.key.Equals(key))
+                {
+                    return false;
+                }
+
                 while (true)
                 {
-                    if (Interlocked.CompareExchange(ref at, mine, null) == null)
+                    if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
                     {
                         return true;
                     }
 
-                    if (at.hash == hashCode && at.viewId == viewId && at.key.Equals(key))
+                    if (at.next.hash == hashCode && at.next.viewId == viewId && at.next.key.Equals(key))
                     {
                         return false;
                     }
@@ -89,48 +100,71 @@ namespace Prototypist.TaskChain
 
 
                 var hashCode = key.GetHashCode();
-                ref Value at = ref backing[hashCode & size];
 
                 var mine = new Value(hashCode, key, value, viewId);
 
+                var at = Interlocked.CompareExchange(ref backing[hashCode & size], mine, null);
+
+                if (at == null)
+                {
+                    return;
+                }
+                else if (at.hash == hashCode && at.viewId == viewId && at.key.Equals(key))
+                {
+                    at.value = value;
+                    return;
+                }
+
                 while (true)
                 {
-                    if (Interlocked.CompareExchange(ref at, mine, null) == null)
+                    if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
                     {
                         return;
                     }
 
-                    if (at.hash == hashCode && at.viewId == viewId && at.key.Equals(key))
+                    if (at.next.hash == hashCode && at.next.viewId == viewId && at.next.key.Equals(key))
                     {
-                        at.value = value;
+                        at.next.value = value;
+                        return;
                     }
 
                     at = at.next;
                 }
             }
 
-            public TValue GetOrAdd(TKey key,  TValue value)
+            public TValue GetOrAdd(TKey key, TValue value)
             {
                 if (key == null)
                 {
                     throw new ArgumentNullException(nameof(key));
                 }
 
-                var hashCode = key.GetHashCode();
-                ref Value at = ref backing[hashCode & size];
 
-                var mine = new Value(hashCode, key, value,viewId);
+                var hashCode = key.GetHashCode();
+
+                var mine = new Value(hashCode, key, value, viewId);
+
+                var at = Interlocked.CompareExchange(ref backing[hashCode & size], mine, null);
+
+                if (at == null)
+                {
+                    return value;
+                }
+                else if (at.hash == hashCode && at.viewId == viewId && at.key.Equals(key))
+                {
+                    return (TValue)at.value;
+                }
 
                 while (true)
                 {
-                    if (Interlocked.CompareExchange(ref at, mine, null) == null)
+                    if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
                     {
                         return value;
                     }
 
-                    if (at.hash == hashCode && at.viewId == viewId && at.key.Equals(key))
+                    if (at.next.hash == hashCode && at.next.viewId == viewId && at.next.key.Equals(key))
                     {
-                        return (TValue)at.value;
+                        return (TValue)at.next.value;
                     }
 
                     at = at.next;
