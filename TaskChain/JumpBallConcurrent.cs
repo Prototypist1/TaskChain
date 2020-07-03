@@ -38,6 +38,13 @@ namespace Prototypist.TaskChain
             return res;
         }
 
+        public virtual void Run(Action<TValue> action)
+        {
+            SpinWait.SpinUntil(() => Interlocked.CompareExchange(ref running, RUNNING, STOPPED) == RUNNING);
+            action(value);
+            running = STOPPED;
+        }
+
         public virtual TValue EnqueRead()
         {
             return Run(x => x);
