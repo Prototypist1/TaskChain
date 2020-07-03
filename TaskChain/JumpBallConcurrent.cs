@@ -28,17 +28,24 @@ namespace Prototypist.TaskChain
             return Run(x => value);
         }
 
-        public virtual TValue Run(Func<TValue, TValue> func)
+        public virtual void Modify(Func<TValue, TValue> func)
         {
             SpinWait.SpinUntil(()=>Interlocked.CompareExchange(ref running, RUNNING, STOPPED) == RUNNING);
 
+            value = func(value);
+            running = STOPPED;
+        }
+
+        public virtual T Run<T>(Func<TValue, T> func)
+        {
+            SpinWait.SpinUntil(() => Interlocked.CompareExchange(ref running, RUNNING, STOPPED) == RUNNING);
+
             var res = func(value);
-            value = res;
             running = STOPPED;
             return res;
         }
 
-        public virtual void Run(Action<TValue> action)
+        public virtual void Act(Action<TValue> action)
         {
             SpinWait.SpinUntil(() => Interlocked.CompareExchange(ref running, RUNNING, STOPPED) == RUNNING);
             action(value);
