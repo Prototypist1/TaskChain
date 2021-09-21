@@ -48,6 +48,12 @@ namespace Prototypist.TaskChain
             base.Act(func);
         }
 
+        public override Task<TValue> RunAsync(Func<TValue, Task<TValue>> func)
+        {
+            SpinWait.SpinUntil(() => built == 1);
+            return base.RunAsync(func);
+        }
+
         public override TValue SetValue(TValue value)
         {
             SpinWait.SpinUntil(() => built == 1);
