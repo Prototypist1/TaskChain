@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Prototypist.TaskChain
 {
@@ -33,6 +34,12 @@ namespace Prototypist.TaskChain
         {
             SpinWait.SpinUntil(() => built == 1);
             return base.Run(func);
+        }
+
+        public override Task<TValue> RunAsync(Func<TValue, Task<TValue>> func)
+        {
+            SpinWait.SpinUntil(() => built == 1);
+            return base.RunAsync(func);
         }
 
         public override TValue SetValue(TValue value)

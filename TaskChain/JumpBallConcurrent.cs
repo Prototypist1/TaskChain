@@ -38,6 +38,16 @@ namespace Prototypist.TaskChain
             return res;
         }
 
+        public virtual async Task<TValue> RunAsync(Func<TValue, Task<TValue>> func)
+        {
+            SpinWait.SpinUntil(() => Interlocked.CompareExchange(ref running, RUNNING, STOPPED) == RUNNING);
+
+            var res = await func(value);
+            value = res;
+            running = STOPPED;
+            return res;
+        }
+
         public virtual TValue EnqueRead()
         {
             return Run(x => x);
