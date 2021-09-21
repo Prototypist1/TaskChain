@@ -30,16 +30,22 @@ namespace Prototypist.TaskChain
             return base.Read();
         }
 
-        public override TValue Run(Func<TValue, TValue> func)
+        public override void Modify(Func<TValue, TValue> func)
+        {
+            SpinWait.SpinUntil(() => built == 1);
+            base.Modify(func);
+        }
+
+        public override T Run<T>(Func<TValue, T> func)
         {
             SpinWait.SpinUntil(() => built == 1);
             return base.Run(func);
         }
 
-        public override Task<TValue> RunAsync(Func<TValue, Task<TValue>> func)
+        public override void Act(Action<TValue> func)
         {
             SpinWait.SpinUntil(() => built == 1);
-            return base.RunAsync(func);
+            base.Act(func);
         }
 
         public override TValue SetValue(TValue value)

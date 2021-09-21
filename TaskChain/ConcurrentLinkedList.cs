@@ -123,6 +123,25 @@ namespace Prototypist.TaskChain
             }
         }
 
+
+        public bool RemoveStart(out TValue res) {
+            while (true)
+            {
+                var toRemove = BoforeStart;
+                if (toRemove.next == null)
+                {
+                    res = default;
+                    return false;
+                }
+                if (Interlocked.CompareExchange(ref BoforeStart, toRemove.next, toRemove) == toRemove)
+                {
+                    Interlocked.Decrement(ref count);
+                    res = toRemove.Value;
+                    return true;
+                }
+            }
+        }
+
         public IEnumerator<TValue> GetEnumerator() {
             var at = BoforeStart.next;
             if (at != null) {
