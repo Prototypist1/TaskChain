@@ -25,7 +25,8 @@ namespace Prototypist.TaskChain
 
         public virtual TValue SetValue(TValue value)
         {
-            return Run(x => value);
+            Modify(x => value);
+            return value;
         }
 
         public virtual void Modify(Func<TValue, TValue> func)
@@ -37,10 +38,12 @@ namespace Prototypist.TaskChain
         }
 
         public virtual T Run<T>(Func<TValue, T> func)
+            where T: TValue
         {
             SpinWait.SpinUntil(() => Interlocked.CompareExchange(ref running, RUNNING, STOPPED) == RUNNING);
 
             var res = func(value);
+            value = res;
             running = STOPPED;
             return res;
         }
