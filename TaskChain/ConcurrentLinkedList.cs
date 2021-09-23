@@ -7,7 +7,7 @@ namespace Prototypist.TaskChain
 {
     public class ConcurrentLinkedList<TValue> : IReadOnlyList<TValue>
     {
-        protected Link BoforeStart = new Link();
+        protected readonly Link BoforeStart = new Link();
         protected volatile Link endOfChain;
         private int count = 0;
 
@@ -109,12 +109,12 @@ namespace Prototypist.TaskChain
         public bool RemoveStart() {
             while (true)
             {
-                var toRemove = BoforeStart;
-                if (toRemove.next == null)
+                var toRemove = BoforeStart.next;
+                if (toRemove == null)
                 {
                     return false;
                 }
-                if (Interlocked.CompareExchange(ref BoforeStart, toRemove.next, toRemove) == toRemove)
+                if (Interlocked.CompareExchange(ref BoforeStart.next, toRemove.next, toRemove) == toRemove)
                 {
                     Interlocked.Decrement(ref count);
 
@@ -127,13 +127,13 @@ namespace Prototypist.TaskChain
         public bool RemoveStart(out TValue res) {
             while (true)
             {
-                var toRemove = BoforeStart;
-                if (toRemove.next == null)
+                var toRemove = BoforeStart.next;
+                if (toRemove == null)
                 {
                     res = default;
                     return false;
                 }
-                if (Interlocked.CompareExchange(ref BoforeStart, toRemove.next, toRemove) == toRemove)
+                if (Interlocked.CompareExchange(ref BoforeStart.next, toRemove.next, toRemove) == toRemove)
                 {
                     Interlocked.Decrement(ref count);
                     res = toRemove.Value;
