@@ -7,13 +7,13 @@ namespace Prototypist.TaskChain
 {
     public class ConcurrentLinkedList<TValue> : IReadOnlyList<TValue>
     {
-        protected readonly Link BoforeStart = new Link();
+        protected volatile Link beforeStart = new Link();
         protected volatile Link endOfChain;
         private int count = 0;
 
         public ConcurrentLinkedList()
         {
-            endOfChain = BoforeStart;
+            endOfChain = beforeStart;
         }
 
         protected class Link
@@ -44,7 +44,7 @@ namespace Prototypist.TaskChain
 
         public bool TryGetFirst(out TValue first)
         {
-            var target = BoforeStart.next;
+            var target = beforeStart.next;
             if (target == null) {
                 first = default;
                 return false;
@@ -55,8 +55,8 @@ namespace Prototypist.TaskChain
 
         public bool TryGetLast(out TValue last)
         {
-            var target = endOfChain;
-            if (target == null)
+            var target = GetEndOfCahin();
+            if (target == beforeStart)
             {
                 last = default;
                 return false;
@@ -69,7 +69,7 @@ namespace Prototypist.TaskChain
             if (i < 0) {
                 throw new IndexOutOfRangeException($"index: {i} is not expected to be to be less than 0");
             }
-            var at = BoforeStart.next;
+            var at = beforeStart.next;
             var myIndex = 0;
             while (true) { 
                 if (myIndex == i) {
@@ -96,54 +96,66 @@ namespace Prototypist.TaskChain
             var link = new Link(value);
             while (true)
             {
-                var myEndOfChain = endOfChain;
+                var myEndOfChain = GetEndOfCahin();
                 if (Interlocked.CompareExchange(ref myEndOfChain.next, link, null) == null)
                 {
-                    endOfChain = endOfChain.next;
                     Interlocked.Increment(ref count);
                     return;
                 }
             }
         }
 
-        public bool RemoveStart() {
+        private Link GetEndOfCahin() {
+            while (true) {
+                var myEndOfChain = endOfChain;
+                if (myEndOfChain.next == null)
+                {
+                    return myEndOfChain;
+                }
+                Interlocked.CompareExchange(ref endOfChain, myEndOfChain.next, myEndOfChain);
+            }
+        }
+
+        public bool RemoveStart() 
+        {
             while (true)
             {
-                var toRemove = BoforeStart.next;
-                if (toRemove == null)
+                var startSnapShot = beforeStart;
+                if (startSnapShot.next == null)
                 {
                     return false;
                 }
-                if (Interlocked.CompareExchange(ref BoforeStart.next, toRemove.next, toRemove) == toRemove)
+                if (Interlocked.CompareExchange(ref beforeStart, startSnapShot.next, startSnapShot) == startSnapShot)
                 {
                     Interlocked.Decrement(ref count);
-
                     return true;
                 }
+                startSnapShot = beforeStart;
             }
         }
 
 
         public bool RemoveStart(out TValue res) {
+
             while (true)
             {
-                var toRemove = BoforeStart.next;
-                if (toRemove == null)
+                var startSnapShot = beforeStart;
+                if (startSnapShot.next == null)
                 {
                     res = default;
                     return false;
                 }
-                if (Interlocked.CompareExchange(ref BoforeStart.next, toRemove.next, toRemove) == toRemove)
+                if (Interlocked.CompareExchange(ref beforeStart, startSnapShot.next, startSnapShot) == startSnapShot)
                 {
                     Interlocked.Decrement(ref count);
-                    res = toRemove.Value;
+                    res = startSnapShot.next.Value;
                     return true;
                 }
             }
         }
 
         public IEnumerator<TValue> GetEnumerator() {
-            var at = BoforeStart.next;
+            var at = beforeStart.next;
             if (at != null) {
                 yield return at.Value;
                 while (at.next != null) {
