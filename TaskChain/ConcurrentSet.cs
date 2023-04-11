@@ -111,15 +111,10 @@ namespace Prototypist.TaskChain
         public IEnumerator<T> GetEnumerator()
         {
             Interlocked.Add(ref enumerationCount, enumerationAdd);
-            while (Volatile.Read(ref enumerationCount) % enumerationAdd != 0)
-            {
-                // TODO do tasks?
-            }
-            foreach (var item in backing)
-            {
-                yield return item.Value;
-            }
+            SpinWait.SpinUntil(() => Volatile.Read(ref enumerationCount) % enumerationAdd == 0);
+            var res = backing.Select(x=>x.Key).ToList();
             Interlocked.Add(ref enumerationCount, -enumerationAdd);
+            return res.GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();

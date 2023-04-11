@@ -123,11 +123,9 @@ namespace Prototypist.TaskChain
         {
             Interlocked.Add(ref enumerationCount, enumerationAdd);
             SpinWait.SpinUntil(()=> Volatile.Read(ref enumerationCount) % enumerationAdd == 0);
-            foreach (var item in backing)
-            {
-                yield return item.Read();
-            }
+            var res = backing.Select(x => x.Read()).ToList();
             Interlocked.Add(ref enumerationCount, -enumerationAdd);
+            return res.GetEnumerator();
         }
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }

@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <AssemblyName>TaskChain.Benchmark</AssemblyName>
     <RootNamespace>Prototypist.TaskChain.Benchmark</RootNamespace>
   </PropertyGroup>

@@ -249,11 +249,9 @@ namespace Prototypist.TaskChain
             {
                 Interlocked.Add(ref enumerationCount, enumerationAdd);
                 SpinWait.SpinUntil(() => Volatile.Read(ref enumerationCount) % enumerationAdd == 0);
-                foreach (var item in backing)
-                {
-                    yield return item.Key;
-                }
+                var res = backing.Keys.ToArray();
                 Interlocked.Add(ref enumerationCount, -enumerationAdd);
+                return res;
             }
         }
 
@@ -264,11 +262,9 @@ namespace Prototypist.TaskChain
 
                 Interlocked.Add(ref enumerationCount, enumerationAdd);
                 SpinWait.SpinUntil(() => Volatile.Read(ref enumerationCount) % enumerationAdd == 0);
-                foreach (var item in backing)
-                {
-                    yield return item.Value.Read();
-                }
+                var res = backing.Values.Select(x=>x.Read()).ToArray();
                 Interlocked.Add(ref enumerationCount, -enumerationAdd);
+                return res;
             }
         }
 
@@ -276,11 +272,9 @@ namespace Prototypist.TaskChain
         {
             Interlocked.Add(ref enumerationCount, enumerationAdd);
             SpinWait.SpinUntil(() => Volatile.Read(ref enumerationCount) % enumerationAdd == 0);
-            foreach (var item in backing)
-            {
-                yield return new KeyValuePair<TKey, TValue>(item.Key, item.Value.Read());
-            }
+            var res = backing.Select(x => new KeyValuePair<TKey, TValue>(x.Key, x.Value.Read())).ToList();
             Interlocked.Add(ref enumerationCount, -enumerationAdd);
+            return res.GetEnumerator();
         }
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
