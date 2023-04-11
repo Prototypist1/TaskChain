@@ -170,6 +170,13 @@ namespace Prototypist.TaskChain
                     at = at.next;
                 }
             }
+
+            // TODO you could do remove
+            // concurrent dict has a good API for it
+            // you remove the key and the value
+            // or you remove the key and it outs the value
+
+            // TODO make a HashSet that shares the same backing
         }
 
         private class Value
