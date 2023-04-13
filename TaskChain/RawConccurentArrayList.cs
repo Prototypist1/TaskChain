@@ -39,6 +39,7 @@ namespace Prototypist.TaskChain
         {
             try
             {
+                var x = new Dictionary<int,int>();
                 var myOuterIndex = i / innerSize;
                 var myInnerIndex = i % innerSize;
                 return backing[myOuterIndex][myInnerIndex] != null;

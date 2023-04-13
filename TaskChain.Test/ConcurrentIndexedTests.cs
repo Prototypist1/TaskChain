@@ -287,25 +287,28 @@ namespace Prototypist.TaskChain.Test
 
                 int count = 0;
 
-                Parallel.Invoke(new int[10000].Select<int, Action>(_ => () => {
-
+                Parallel.Invoke(new int[10000].Select<int, Action>(_ => {
                     var value = random.Next(1000);
-                    if (random.Next(2) == 1)
+                    var add = random.Next(2) == 1;
+                    return () =>
                     {
-                        if (thing.TryAdd(value, value.ToString()))
+                        if (add)
                         {
-                            Interlocked.Increment(ref check[value]);
-                            Interlocked.Increment(ref count);
+                            if (thing.TryAdd(value, value.ToString()))
+                            {
+                                Interlocked.Increment(ref check[value]);
+                                Interlocked.Increment(ref count);
+                            }
                         }
-                    }
-                    else
-                    {
-                        if (thing.TryRemove(value, out var _))
+                        else
                         {
-                            Interlocked.Decrement(ref check[value]);
-                            Interlocked.Decrement(ref count);
+                            if (thing.TryRemove(value, out var _))
+                            {
+                                Interlocked.Decrement(ref check[value]);
+                                Interlocked.Decrement(ref count);
+                            }
                         }
-                    }
+                    };
                 }).ToArray());
 
 

@@ -177,6 +177,18 @@ namespace Prototypist.TaskChain
             // or you remove the key and it outs the value
 
             // TODO make a HashSet that shares the same backing
+
+            // and now I want to rewrite this
+            // the size is prime
+            // when you go to insert of lookup
+            // key the hashcode % prime
+            // and walk by that 
+            // idk
+            // what do I know is this is bugged
+            // Ants hangs when I use it
+
+            // ...and this thing is a memory nightmare
+            // you have to manually take stuff out or else it'll never be garbage collected 
         }
 
         private class Value

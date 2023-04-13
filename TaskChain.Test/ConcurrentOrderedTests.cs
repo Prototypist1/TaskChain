@@ -69,22 +69,26 @@ namespace Prototypist.TaskChain.Test
             }
         }
 
-        [Fact]
-        public void UpdateAndIterate()
-        {
-            for (int k = 0; k < 1000; k++)
-            {
-                var student = new ConcurrentArrayList<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
+        // this is a bad test
+        // ConcurrentArrayList's itterator makes a copy of the list and itterates on that
+        // you would have to try to get while that copy is being made for it to fail
+        //
+        //[Fact]
+        //public void UpdateAndIterate()
+        //{
+        //    for (int k = 0; k < 1000; k++)
+        //    {
+        //        var student = new ConcurrentArrayList<int>(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
 
-                Assert.ThrowsAny<Exception>(() =>
-                {
-                    foreach (var item in student)
-                    {
-                        student[0] = item;
-                    }
-                });
-            }
-        }
+        //        Assert.ThrowsAny<Exception>(() =>
+        //        {
+        //            foreach (var item in student)
+        //            {
+        //                student[0] = item;
+        //            }
+        //        });
+        //    }
+        //}
 
         [Fact]
         public void ReadAndIterate()

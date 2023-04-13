@@ -79,42 +79,39 @@ namespace Prototypist.TaskChain.Test
         }
 
         [Fact]
-        public async Task AddUpdateParallel()
+        public void AddUpdateParallel()
         {
-
-
-
-            var tasks = new List<Task>();
+            var tasks = new List<Action>();
             for (var i = 0; i < 500 * 4; i += 4)
             {
                 var j = i;
-                tasks.Add(Task.Run(() => AddOrUpdate(j)));
-                tasks.Add(Task.Run(() => GetOrAdd(j + 1)));
-                tasks.Add(Task.Run(() => TryGetValue(j + 2)));
-                tasks.Add(Task.Run(() => GetOrThrow(j + 3)));
+                tasks.Add(() => AddOrUpdate(j));
+                tasks.Add(() => GetOrAdd(j + 1));
+                tasks.Add(() => TryGetValue(j + 2));
+                tasks.Add(() => GetOrThrow(j + 3));
             }
 
-            await Task.WhenAll(tasks.ToArray());
+            Parallel.Invoke(tasks.ToArray());
 
         }
 
         [Fact]
-        public async Task AddUpdateParallelSameView()
+        public void AddUpdateParallelSameView()
         {
 
             var thing = new MonsterIndexBackedIndex.View<int, string>();
 
-            var tasks = new List<Task>();
+            var tasks = new List<Action>();
             for (var i = 0; i < 500 * 4; i += 4)
             {
                 var j = i;
-                tasks.Add(Task.Run(() => AddOrUpdateInner(j, thing)));
-                tasks.Add(Task.Run(() => GetOrAddInner(j + 1, thing)));
-                tasks.Add(Task.Run(() => TryGetValueInner(j + 2, thing)));
-                tasks.Add(Task.Run(() => GetOrThrowInner(j + 3, thing)));
+                tasks.Add(() => AddOrUpdateInner(j, thing));
+                tasks.Add(() => GetOrAddInner(j + 1, thing));
+                tasks.Add(() => TryGetValueInner(j + 2, thing));
+                tasks.Add(() => GetOrThrowInner(j + 3, thing));
             }
 
-            await Task.WhenAll(tasks.ToArray());
+            Parallel.Invoke(tasks.ToArray());
 
         }
     }
