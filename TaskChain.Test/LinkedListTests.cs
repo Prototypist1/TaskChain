@@ -42,9 +42,42 @@ namespace Prototypist.TaskChain.Test
 
                 Parallel.Invoke( actions.OrderBy(x => random.NextDouble()).ToArray());
 
-                Assert.Equal(toAdd-removed,subject.Count);
+                Assert.Equal(toAdd-removed, subject.Count);
                 Assert.Equal(toAdd - removed, subject.Count());
 
+            }
+        }
+
+        [Fact]
+        public void AddRemove() {
+            for (int i = 0; i < 1000; i++)
+            {
+                var random = new Random();
+                var subject = new ConcurrentLinkedList<int>();
+
+                var addCount = 1000;
+
+                var toAdd = new int[addCount].Select(_ => random.Next(0, 1000)).ToArray();
+                var toRemove = new int[addCount].Select(_ => random.Next(0, 1000)).ToArray();
+
+                var actions = new List<Action>();
+
+                for (int j = 0; j < toAdd.Length; j++)
+                {
+                    var target = toAdd[j];
+                    actions.Add(() => subject.Add(target));
+                }
+
+                for (int j = 0; j < toRemove.Length; j++)
+                {
+                    var target = toRemove[j];
+                    subject.Add(target);
+                    actions.Add(() => subject.Remove(target));
+                }
+
+                Parallel.Invoke(actions.OrderBy(x => random.NextDouble()).ToArray());
+
+                Assert.Equal(addCount, subject.Count);
             }
         }
     }

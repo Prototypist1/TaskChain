@@ -14,6 +14,10 @@ namespace Prototypist.TaskChain
         {
 
             private readonly int viewId;
+            // these are just to keep everything from being garbage collected
+            // we use weak references on Value otherwise nothing would ever get garbage collected
+            private readonly ConcurrentLinkedList<TValue> values = new ConcurrentLinkedList<TValue>();
+            private readonly ConcurrentLinkedList<TKey> keys = new ConcurrentLinkedList<TKey>();
 
             public View()
             {
@@ -33,9 +37,9 @@ namespace Prototypist.TaskChain
                         value = default;
                         return false;
                     }
-                    else if (at.hash == hashCode && at.viewId == viewId && at.key.Equals(key))
+                    else if (at.hash == hashCode && at.viewId == viewId && at.value.IsAlive && at.key.Target.Equals(key))
                     {
-                        value = (TValue)at.value;
+                        value = (TValue)at.value.Target;
                         return true;
                     }
 
@@ -59,35 +63,54 @@ namespace Prototypist.TaskChain
                     throw new ArgumentNullException(nameof(key));
                 }
 
-
                 var hashCode = key.GetHashCode();
 
                 var mine = new Value(hashCode, key, value, viewId);
 
-                var at = Interlocked.CompareExchange(ref backing[hashCode & size], mine, null);
 
-                if (at == null)
+                Value at;
+
+                while (true)
                 {
-                    return true;
-                }
-                else if (at.hash == hashCode && at.viewId == viewId && at.key.Equals(key))
-                {
-                    return false;
+                    at = Interlocked.CompareExchange(ref backing[hashCode & size], mine, null);
+
+                    if (at == null)
+                    {
+                        values.Add(value);
+                        keys.Add(key);
+                        return true;
+                    }
+                    else if (at.hash == hashCode && at.viewId == viewId && at.value.IsAlive && at.key.Target.Equals(key))
+                    {
+                        return false;
+                    }
+                    else if (!at.value.IsAlive)
+                    {
+                        if (at != Interlocked.CompareExchange(ref backing[hashCode & size], at.next, at))
+                        {
+                            break;
+                        }
+                    }
+                    else { 
+                        break;
+                    }
                 }
 
                 while (true)
                 {
                     if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
                     {
+                        values.Add(value);
+                        keys.Add(key);
                         return true;
                     }
 
-                    if (at.next.hash == hashCode && at.next.viewId == viewId && at.next.key.Equals(key))
+                    at = at.next;
+
+                    if (at.hash == hashCode && at.viewId == viewId && at.value.IsAlive && at.key.Target.Equals(key))
                     {
                         return false;
                     }
-
-                    at = at.next;
                 }
             }
 
@@ -103,32 +126,56 @@ namespace Prototypist.TaskChain
 
                 var mine = new Value(hashCode, key, value, viewId);
 
-                var at = Interlocked.CompareExchange(ref backing[hashCode & size], mine, null);
+                Value at;
 
-                if (at == null)
+                while (true)
                 {
-                    return;
-                }
-                else if (at.hash == hashCode && at.viewId == viewId && at.key.Equals(key))
-                {
-                    at.value = value;
-                    return;
+                    at = Interlocked.CompareExchange(ref backing[hashCode & size], mine, null);
+
+                    if (at == null)
+                    {
+                        values.Add(value);
+                        keys.Add(key);
+                        return;
+                    }
+                    else if (at.hash == hashCode && at.viewId == viewId && at.value.IsAlive && at.key.Target.Equals(key))
+                    {
+                        at.value = new WeakReference(value);
+                        values.Add(value);
+                        keys.Add(key);
+                        return;
+                    }
+                    else if (!at.value.IsAlive)
+                    {
+                        if (at != Interlocked.CompareExchange(ref backing[hashCode & size], at.next, at))
+                        {
+                            break;
+                        }
+                    }
+                    else {
+                        break;
+                    }
                 }
 
                 while (true)
                 {
                     if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
                     {
-                        return;
-                    }
-
-                    if (at.next.hash == hashCode && at.next.viewId == viewId && at.next.key.Equals(key))
-                    {
-                        at.next.value = value;
+                        values.Add(value);
+                        keys.Add(key);
                         return;
                     }
 
                     at = at.next;
+
+                    if (at.hash == hashCode && at.viewId == viewId && at.value.IsAlive && at.key.Target.Equals(key))
+                    {
+                        at.value = new WeakReference(value);
+                        values.Add(value);
+                        keys.Add(key);
+                        return;
+                    }
+
                 }
             }
 
@@ -139,35 +186,54 @@ namespace Prototypist.TaskChain
                     throw new ArgumentNullException(nameof(key));
                 }
 
-
                 var hashCode = key.GetHashCode();
 
                 var mine = new Value(hashCode, key, value, viewId);
 
-                var at = Interlocked.CompareExchange(ref backing[hashCode & size], mine, null);
+                Value at;
 
-                if (at == null)
+                while (true)
                 {
-                    return value;
-                }
-                else if (at.hash == hashCode && at.viewId == viewId && at.key.Equals(key))
-                {
-                    return (TValue)at.value;
+                    at = Interlocked.CompareExchange(ref backing[hashCode & size], mine, null);
+
+                    if (at == null)
+                    {
+                        values.Add(value);
+                        keys.Add(key);
+                        return value;
+                    }
+                    else if (at.hash == hashCode && at.viewId == viewId && at.value.IsAlive && at.key.Target.Equals(key))
+                    {
+                        return (TValue)at.value.Target;
+                    }
+                    else if (!at.value.IsAlive)
+                    {
+                        if (at != Interlocked.CompareExchange(ref backing[hashCode & size], at.next, at))
+                        {
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        break;
+                    }   
                 }
 
                 while (true)
                 {
                     if (Interlocked.CompareExchange(ref at.next, mine, null) == null)
                     {
+                        values.Add(value);
+                        keys.Add(key);
                         return value;
                     }
 
-                    if (at.next.hash == hashCode && at.next.viewId == viewId && at.next.key.Equals(key))
-                    {
-                        return (TValue)at.next.value;
-                    }
-
                     at = at.next;
+
+                    if (at.hash == hashCode && at.viewId == viewId && at.value.IsAlive && at.key.Target.Equals(key))
+                    {
+                        return (TValue)at.value.Target;
+                    }
                 }
             }
 
@@ -196,14 +262,14 @@ namespace Prototypist.TaskChain
             public readonly int viewId;
             public Value next;
             public readonly int hash;
-            public readonly object key;
-            public object value;
+            public readonly WeakReference key;
+            public WeakReference value;
 
             public Value(int hash, object key, object value, int viewId)
             {
                 this.hash = hash;
-                this.key = key;
-                this.value = value;
+                this.key = new WeakReference(key);
+                this.value = new WeakReference(value);
                 this.viewId = viewId;
             }
         }
